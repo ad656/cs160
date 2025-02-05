@@ -1,7 +1,7 @@
 __kernel void matrixMultiply(
-    __global const int *restrict A, 
-    __global const int *restrict B, 
-    __global int *restrict C,
+    __global const short *restrict A,  // 16-bit input
+    __global const short *restrict B,  // 16-bit input
+    __global int *restrict C,          // 32-bit output
     const unsigned int numARows, 
     const unsigned int numAColumns,
     const unsigned int numBRows, 
@@ -9,12 +9,11 @@ __kernel void matrixMultiply(
     const unsigned int numCRows, 
     const unsigned int numCColumns) 
 {
-    #define TILE_SIZE 32  // Increased tile size
-    #define PADDING 1
+    #define TILE_SIZE 32
+    #define SIMD_WIDTH 8  // AMD-specific optimization
     
-    // Double buffered local memory
-    __local int Atile[2][TILE_SIZE][TILE_SIZE + PADDING];
-    __local int Btile[2][TILE_SIZE][TILE_SIZE + PADDING];
+    __local int Atile[TILE_SIZE][TILE_SIZE];
+    __local int Btile[TILE_SIZE][TILE_SIZE];
     
     const int globalRow = get_global_id(0);
     const int globalCol = get_global_id(1);
@@ -24,46 +23,34 @@ __kernel void matrixMultiply(
     int sum = 0;
     const int numTiles = (numAColumns + TILE_SIZE - 1) / TILE_SIZE;
     
-    // Preload first tile
-    int loadTile = 0;
-    {
-        const int tileOffset = 0;
-        const int aCol = tileOffset + localCol;
-        Atile[loadTile][localRow][localCol] = 
-            (globalRow < numARows && aCol < numAColumns) ? 
-            A[globalRow * numAColumns + aCol] : 0;
-            
-        const int bRow = tileOffset + localRow;
-        Btile[loadTile][localCol][localRow] = 
-            (bRow < numBRows && globalCol < numBColumns) ? 
-            B[bRow * numBColumns + globalCol] : 0;
-    }
-    
-    barrier(CLK_LOCAL_MEM_FENCE);
+    // AMD Wavefront optimization
+    const int wavefrontIdx = localRow % SIMD_WIDTH;
     
     for (int tile = 0; tile < numTiles; ++tile) {
-        const int nextTile = (tile + 1) % 2;
-        const int currentTile = tile % 2;
+        const int tileOffset = tile * TILE_SIZE;
         
-        // Async load next tile while computing current
-        if(tile < numTiles - 1) {
-            const int tileOffset = (tile + 1) * TILE_SIZE;
-            const int aCol = tileOffset + localCol;
-            Atile[nextTile][localRow][localCol] = 
-                (globalRow < numARows && aCol < numAColumns) ? 
-                A[globalRow * numAColumns + aCol] : 0;
-                
-            const int bRow = tileOffset + localRow;
-            Btile[nextTile][localCol][localRow] = 
-                (bRow < numBRows && globalCol < numBColumns) ? 
-                B[bRow * numBColumns + globalCol] : 0;
-        }
+        // Coalesced load with 16-bit elements
+        const int aCol = tileOffset + localCol;
+        Atile[localRow][localCol] = (globalRow < numARows && aCol < numAColumns) ?
+            (int)A[globalRow * numAColumns + aCol] : 0;
+            
+        const int bRow = tileOffset + localRow;
+        Btile[localCol][localRow] = (bRow < numBRows && globalCol < numBColumns) ?
+            (int)B[bRow * numBColumns + globalCol] : 0;
         
-        // Compute current tile
+        barrier(CLK_LOCAL_MEM_FENCE);
+        
+        // Warp shuffling optimization (AMD)
         #pragma unroll
-        for(int k = 0; k < TILE_SIZE; ++k) {
-            sum += Atile[currentTile][localRow][k] * 
-                   Btile[currentTile][localCol][k];
+        for(int k = 0; k < TILE_SIZE; k += SIMD_WIDTH) {
+            int a_val = Atile[localRow][k + wavefrontIdx];
+            int b_val = Btile[localCol][k + wavefrontIdx];
+            
+            // SIMD-wide reduction
+            sum += a_val * b_val;
+            sum += __shfl_down(sum, 1);
+            sum += __shfl_down(sum, 2);
+            sum += __shfl_down(sum, 4);
         }
         
         barrier(CLK_LOCAL_MEM_FENCE);
