@@ -55,22 +55,22 @@ __kernel void matrixMultiply(
         barrier(CLK_LOCAL_MEM_FENCE);
         
         // Compute partial dot product for this tile  
-        sum += Atile[localRow][k] * Btile[k][localCol];
-        sum += Atile[localRow][k+1] * Btile[k+1][localCol];
-        sum += Atile[localRow][k+2] * Btile[k+2][localCol];
-        sum += Atile[localRow][k+3] * Btile[k+3][localCol];
-        sum += Atile[localRow][k+4] * Btile[k+4][localCol];
-        sum += Atile[localRow][k+5] * Btile[k+5][localCol];
-        sum += Atile[localRow][k+6] * Btile[k+6][localCol];
-        sum += Atile[localRow][k+7] * Btile[k+7][localCol];
-        sum += Atile[localRow][k+8] * Btile[k+8][localCol];
-        sum += Atile[localRow][k+9] * Btile[k+9][localCol];
-        sum += Atile[localRow][k+10] * Btile[k+10][localCol];
-        sum += Atile[localRow][k+11] * Btile[k+11][localCol];
-        sum += Atile[localRow][k+12] * Btile[k+12][localCol];
-        sum += Atile[localRow][k+13] * Btile[k+13][localCol];
-        sum += Atile[localRow][k+14] * Btile[k+14][localCol];
-        sum += Atile[localRow][k+15] * Btile[k+15][localCol];
+        sum += Atile[localRow][0] * Btile[0][localCol];
+        sum += Atile[localRow][1] * Btile[1][localCol];
+        sum += Atile[localRow][2] * Btile[2][localCol];
+        sum += Atile[localRow][3] * Btile[3][localCol];
+        sum += Atile[localRow][4] * Btile[4][localCol];
+        sum += Atile[localRow][5] * Btile[5][localCol];
+        sum += Atile[localRow][6] * Btile[6][localCol];
+        sum += Atile[localRow][7] * Btile[7][localCol];
+        sum += Atile[localRow][8] * Btile[8][localCol];
+        sum += Atile[localRow][9] * Btile[9][localCol];
+        sum += Atile[localRow][10] * Btile[10][localCol];
+        sum += Atile[localRow][11] * Btile[11][localCol];
+        sum += Atile[localRow][12] * Btile[12][localCol];
+        sum += Atile[localRow][13] * Btile[13][localCol];
+        sum += Atile[localRow][14] * Btile[14][localCol];
+        sum += Atile[localRow][15] * Btile[15][localCol];
         
         // Ensure computation is complete before loading next tile
         barrier(CLK_LOCAL_MEM_FENCE);
