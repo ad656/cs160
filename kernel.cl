@@ -9,11 +9,12 @@ __kernel void matrixMultiply(
     const unsigned int numCRows, 
     const unsigned int numCColumns) 
 {
-    #define TILE_SIZE 16
-    #define VEC_SIZE 4  // Process 4 elements at once
+    #define TILE_SIZE 32  // Increased tile size
+    #define PADDING 1
     
-    __local int Atile[TILE_SIZE][TILE_SIZE + 1];  // Padded
-    __local int Btile[TILE_SIZE][TILE_SIZE + 1];  // Padded
+    // Double buffered local memory
+    __local int Atile[2][TILE_SIZE][TILE_SIZE + PADDING];
+    __local int Btile[2][TILE_SIZE][TILE_SIZE + PADDING];
     
     const int globalRow = get_global_id(0);
     const int globalCol = get_global_id(1);
@@ -22,42 +23,47 @@ __kernel void matrixMultiply(
     
     int sum = 0;
     const int numTiles = (numAColumns + TILE_SIZE - 1) / TILE_SIZE;
-
-    // Vectorized version for tile loading
+    
+    // Preload first tile
+    int loadTile = 0;
+    {
+        const int tileOffset = 0;
+        const int aCol = tileOffset + localCol;
+        Atile[loadTile][localRow][localCol] = 
+            (globalRow < numARows && aCol < numAColumns) ? 
+            A[globalRow * numAColumns + aCol] : 0;
+            
+        const int bRow = tileOffset + localRow;
+        Btile[loadTile][localCol][localRow] = 
+            (bRow < numBRows && globalCol < numBColumns) ? 
+            B[bRow * numBColumns + globalCol] : 0;
+    }
+    
+    barrier(CLK_LOCAL_MEM_FENCE);
+    
     for (int tile = 0; tile < numTiles; ++tile) {
-        const int tileOffset = tile * TILE_SIZE;
+        const int nextTile = (tile + 1) % 2;
+        const int currentTile = tile % 2;
         
-        // Vector load for A
-        if (globalRow < numARows) {
-            const int aCol = tileOffset + localCol * VEC_SIZE;
-            #pragma unroll
-            for(int i = 0; i < VEC_SIZE; ++i) {
-                Atile[localRow][localCol * VEC_SIZE + i] = 
-                    (aCol + i < numAColumns) ? 
-                    A[globalRow * numAColumns + aCol + i] : 0;
-            }
+        // Async load next tile while computing current
+        if(tile < numTiles - 1) {
+            const int tileOffset = (tile + 1) * TILE_SIZE;
+            const int aCol = tileOffset + localCol;
+            Atile[nextTile][localRow][localCol] = 
+                (globalRow < numARows && aCol < numAColumns) ? 
+                A[globalRow * numAColumns + aCol] : 0;
+                
+            const int bRow = tileOffset + localRow;
+            Btile[nextTile][localCol][localRow] = 
+                (bRow < numBRows && globalCol < numBColumns) ? 
+                B[bRow * numBColumns + globalCol] : 0;
         }
         
-        // Vector load for B
-        if (globalCol < numBColumns) {
-            const int bRow = tileOffset + localRow * VEC_SIZE;
-            #pragma unroll
-            for(int i = 0; i < VEC_SIZE; ++i) {
-                Btile[localCol][localRow * VEC_SIZE + i] = 
-                    (bRow + i < numBRows) ? 
-                    B[(bRow + i) * numBColumns + globalCol] : 0;
-            }
-        }
-        
-        barrier(CLK_LOCAL_MEM_FENCE);
-
-        // Vectorized computation
+        // Compute current tile
         #pragma unroll
-        for (int k = 0; k < TILE_SIZE; k += VEC_SIZE) {
-            sum += Atile[localRow][k] * Btile[localCol][k];
-            sum += Atile[localRow][k+1] * Btile[localCol][k+1];
-            sum += Atile[localRow][k+2] * Btile[localCol][k+2];
-            sum += Atile[localRow][k+3] * Btile[localCol][k+3];
+        for(int k = 0; k < TILE_SIZE; ++k) {
+            sum += Atile[currentTile][localRow][k] * 
+                   Btile[currentTile][localCol][k];
         }
         
         barrier(CLK_LOCAL_MEM_FENCE);
