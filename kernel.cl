@@ -9,74 +9,52 @@ __kernel void matrixMultiply(
     const unsigned int numCRows, 
     const unsigned int numCColumns) 
 {
+    #define TILE_SIZE 16
+    #define PADDING 1  // Anti-bank-conflict padding
     
+    // Local memory tiles with bank conflict avoidance
+    __local int Atile[TILE_SIZE][TILE_SIZE + PADDING];
+    __local int Btile[TILE_SIZE][TILE_SIZE + PADDING];
     
-    // Local memory tiles
-    __local int Atile[16][16];
-    __local int Btile[16][16];
-    
-    // Get thread indices
+    // Thread indices
     const int globalRow = get_global_id(0);
     const int globalCol = get_global_id(1);
     const int localRow = get_local_id(0);
     const int localCol = get_local_id(1);
     
-    // Initialize accumulator
+    // Accumulator with faster register allocation
     int sum = 0;
     
-    // Calculate number of tiles needed
-    const int numTiles = (numAColumns + 15) / 16;
-    
-    // Process each tile
-    for (int tile = 0; tile < numTiles; tile++) {
-        const int tileOffset = tile * 16;
+    // Tile processing
+    const int numTiles = (numAColumns + TILE_SIZE - 1) / TILE_SIZE;
+    for (int tile = 0; tile < numTiles; ++tile) {
+        const int tileOffset = tile * TILE_SIZE;
         
-        // Load tile from matrix A
-        const int aRow = globalRow;
+        // Coalesced A tile load
         const int aCol = tileOffset + localCol;
+        Atile[localRow][localCol] = (globalRow < numARows && aCol < numAColumns) 
+            ? A[globalRow * numAColumns + aCol] 
+            : 0;
         
-        if (aRow < numARows && aCol < numAColumns) {
-            Atile[localRow][localCol] = A[aRow * numAColumns + aCol];
-        } else {
-            Atile[localRow][localCol] = 0;
-        }
-        
-        // Load tile from matrix B
+        // Coalesced B tile load with transposed storage
         const int bRow = tileOffset + localRow;
-        const int bCol = globalCol;
+        Btile[localCol][localRow] = (bRow < numBRows && globalCol < numBColumns) 
+            ? B[bRow * numBColumns + globalCol] 
+            : 0;
         
-        if (bRow < numBRows && bCol < numBColumns) {
-            Btile[localRow][localCol] = B[bRow * numBColumns + bCol];
-        } else {
-            Btile[localRow][localCol] = 0;
-        }
-        
-        // Ensure all threads have loaded their data
+        // Memory fence for local data
         barrier(CLK_LOCAL_MEM_FENCE);
         
-        // Compute partial dot product for this tile  
-        sum += Atile[localRow][0] * Btile[0][localCol];
-        sum += Atile[localRow][1] * Btile[1][localCol];
-        sum += Atile[localRow][2] * Btile[2][localCol];
-        sum += Atile[localRow][3] * Btile[3][localCol];
-        sum += Atile[localRow][4] * Btile[4][localCol];
-        sum += Atile[localRow][5] * Btile[5][localCol];
-        sum += Atile[localRow][6] * Btile[6][localCol];
-        sum += Atile[localRow][7] * Btile[7][localCol];
-        sum += Atile[localRow][8] * Btile[8][localCol];
-        sum += Atile[localRow][9] * Btile[9][localCol];
-        sum += Atile[localRow][10] * Btile[10][localCol];
-        sum += Atile[localRow][11] * Btile[11][localCol];
-        sum += Atile[localRow][12] * Btile[12][localCol];
-        sum += Atile[localRow][13] * Btile[13][localCol];
-        sum += Atile[localRow][14] * Btile[14][localCol];
-        sum += Atile[localRow][15] * Btile[15][localCol];
+        // Unrolled computation with reduced address calculations
+        #pragma unroll
+        for (int k = 0; k < TILE_SIZE; ++k) {
+            sum += Atile[localRow][k] * Btile[localCol][k];
+        }
         
-        // Ensure computation is complete before loading next tile
         barrier(CLK_LOCAL_MEM_FENCE);
     }
     
-    // Store the result only if within bounds
+    // Final store with coalesced write
     if (globalRow < numCRows && globalCol < numCColumns) {
         C[globalRow * numCColumns + globalCol] = sum;
     }
