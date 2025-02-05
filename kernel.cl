@@ -9,11 +9,11 @@ __kernel void matrixMultiply(
     const unsigned int numCRows, 
     const unsigned int numCColumns) 
 {
-    #define TILE_SIZE 32
+    
     
     // Local memory tiles
-    __local int Atile[TILE_SIZE][TILE_SIZE];
-    __local int Btile[TILE_SIZE][TILE_SIZE];
+    __local int Atile[16][16];
+    __local int Btile[T16][16];
     
     // Get thread indices
     const int globalRow = get_global_id(0);
@@ -25,11 +25,11 @@ __kernel void matrixMultiply(
     int sum = 0;
     
     // Calculate number of tiles needed
-    const int numTiles = (numAColumns + TILE_SIZE - 1) / TILE_SIZE;
+    const int numTiles = (numAColumns + 15) / 16;
     
     // Process each tile
     for (int tile = 0; tile < numTiles; tile++) {
-        const int tileOffset = tile * TILE_SIZE;
+        const int tileOffset = tile * 16;
         
         // Load tile from matrix A
         const int aRow = globalRow;
