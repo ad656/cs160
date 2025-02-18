@@ -1,37 +1,44 @@
 __kernel void convolution2D(
-    __global int *inputData, __global int *outputData, __constant int *maskData,
-    int width, int height, int maskWidth, int imageChannels) {
+    __global int * inputData,
+    __global int * outputData,
+    __constant int * maskData,
+    int width,
+    int height,
+    int maskWidth,
+    int imageChannels,
+    int stride) {
     
-    // Get global work-item indices
-    int j = get_global_id(0); // Column index (X coordinate)
-    int i = get_global_id(1); // Row index (Y coordinate)
+    // Get the index of the current element
+    int j = get_global_id(0); // column/width index
+    int i = get_global_id(1); // row/height index
+    int channels = 3; // As per instructions, we can assume channels is always 3
     
-    // Calculate mask radius (integer division)
+    // VALID padding means we only compute output for positions where the kernel fits entirely
     int maskRadius = maskWidth / 2;
     
-    // Ensure output is within valid bounds for VALID padding
-    if (i >= maskRadius && i < height - maskRadius && j >= maskRadius && j < width - maskRadius) {
-        for (int k = 0; k < imageChannels; k++) { // Iterate over R, G, B channels
-            float accum = 0.0f;
+    // Check if this thread is within the valid output dimensions (VALID padding)
+    if (i < height && j < width) {
+        // Perform convolution for each channel
+        for (int k = 0; k < channels; k++) {
+            int accum = 0;
             
-            // Apply convolution mask
+            // Convolve the mask with the input data
             for (int y = -maskRadius; y <= maskRadius; y++) {
                 for (int x = -maskRadius; x <= maskRadius; x++) {
                     int xOffset = j + x;
                     int yOffset = i + y;
                     
-                    // Compute index for input and mask
-                    int inputIdx = (yOffset * width + xOffset) * imageChannels + k;
-                    int maskIdx = (y + maskRadius) * maskWidth + (x + maskRadius);
-                    
-                    // Accumulate weighted sum
-                    accum += inputData[inputIdx] * maskData[maskIdx];
+                    // Check bounds - this implements VALID padding
+                    if (xOffset >= 0 && xOffset < width && yOffset >= 0 && yOffset < height) {
+                        int imagePixel = inputData[(yOffset * width + xOffset) * channels + k];
+                        int maskValue = maskData[(y + maskRadius) * maskWidth + (x + maskRadius)];
+                        accum += imagePixel * maskValue;
+                    }
                 }
             }
             
-            // Store result in output array (Clamp between 0 and 1 as per instructions)
-            int outIdx = (i * width + j) * imageChannels + k;
-            outputData[outIdx] = clamp(accum, 0.0f, 1.0f);
+            // Store the result in output
+            outputData[(i * width + j) * channels + k] = accum;
         }
     }
 }
