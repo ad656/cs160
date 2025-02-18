@@ -117,11 +117,7 @@ void OpenCLConvolution2D(Image *input0, Matrix *input1, Image *result, int strid
     clReleaseMemObject(device_a);
     clReleaseMemObject(device_b);
     clReleaseMemObject(device_c);
-    clReleaseKernel(kernel);
-    clReleaseProgram(program);
-    clReleaseCommandQueue(queue);
-    clReleaseContext(context);
-    free(kernel_source);
+    
 
 }
 
