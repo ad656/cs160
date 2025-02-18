@@ -12,8 +12,8 @@ kernel void convolution2D(
     int outputHeight = height - maskWidth + 1;
     int outputWidth = width - maskWidth + 1;
 
-    int output_i = get_global_id(0);
-    int output_j = get_global_id(1);
+    int output_j = get_global_id(0);
+    int output_i = get_global_id(1);
 
     if (output_i >= outputHeight || output_j >= outputWidth) {
         return;
