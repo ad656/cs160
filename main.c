@@ -23,9 +23,51 @@
 
 void OpenCLConvolution2D(Image *input0, Matrix *input1, Image *result, int stride)
 {
-    // ... existing code ...
+    // Load external OpenCL kernel code
+    char *kernel_source = OclLoadKernel(KERNEL_PATH); // Load kernel source
 
-    //@@ Allocate GPU memory here
+    // Device input and output buffers
+    cl_mem device_a, device_b, device_c;
+
+    cl_int err;
+
+    cl_device_id device_id;    // device ID
+    cl_context context;        // context
+    cl_command_queue queue;    // command queue
+    cl_program program;        // program
+    cl_kernel kernel;          // kernel
+
+    // Find platforms and devices
+    OclPlatformProp *platforms = NULL;
+    cl_uint num_platforms;
+
+    err = OclFindPlatforms((const OclPlatformProp **)&platforms, &num_platforms);
+    CHECK_ERR(err, "OclFindPlatforms");
+
+    // Get the ID for the specified kind of device type.
+    err = OclGetDeviceWithFallback(&device_id, OCL_DEVICE_TYPE);
+    CHECK_ERR(err, "OclGetDeviceWithFallback");
+
+    // Create a context
+    context = clCreateContext(0, 1, &device_id, NULL, NULL, &err);
+    CHECK_ERR(err, "clCreateContext");
+
+    // Create a command queue
+    queue = clCreateCommandQueueWithProperties(context, device_id, 0, &err);
+    CHECK_ERR(err, "clCreateCommandQueueWithProperties");
+
+    // Create the program from the source buffer
+    program = clCreateProgramWithSource(context, 1, (const char **)&kernel_source, NULL, &err);
+    CHECK_ERR(err, "clCreateProgramWithSource");
+
+    // Build the program executable
+    err = clBuildProgram(program, 0, NULL, NULL, NULL, NULL);
+    CHECK_ERR(err, "clBuildProgram");
+
+    // Create the compute kernel in the program we wish to run
+    kernel = clCreateKernel(program, "convolution2D", &err);
+    CHECK_ERR(err, "clCreateKernel");
+
     device_a = clCreateBuffer(context, CL_MEM_READ_ONLY, 
                              sizeof(int) * input0->shape[0] * input0->shape[1] * IMAGE_CHANNELS, 
                              NULL, &err);
@@ -80,6 +122,7 @@ void OpenCLConvolution2D(Image *input0, Matrix *input1, Image *result, int strid
     clReleaseCommandQueue(queue);
     clReleaseContext(context);
     free(kernel_source);
+
 }
 
 int main(int argc, char *argv[])
