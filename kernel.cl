@@ -1,55 +1,37 @@
 __kernel void convolution2D(
-    __global int * inputData, __global int * outputData, __constant int * maskData,
-    int width, int height, int maskWidth, int imageChannels, int stride) {
+    __global int *inputData, __global int *outputData, __constant int *maskData,
+    int width, int height, int maskWidth, int imageChannels) {
     
-    // Get the global ID of the work-item (x, y coordinates)
-    int j = get_global_id(0);
-    int i = get_global_id(1);
+    // Get global work-item indices
+    int j = get_global_id(0); // Column index (X coordinate)
+    int i = get_global_id(1); // Row index (Y coordinate)
     
-    // Calculate mask radius
+    // Calculate mask radius (integer division)
     int maskRadius = maskWidth / 2;
     
-    // Check boundaries
-    if (i < height && j < width) {
-        // Calculate output coordinates based on stride
-        int outRow = i / stride;
-        int outCol = j / stride;
-        
-        // Skip if not on stride
-        if (i % stride != 0 || j % stride != 0) {
-            return;
-        }
-        
-        // For each channel
-        for (int k = 0; k < imageChannels; k++) {
-            int accum = 0;
+    // Ensure output is within valid bounds for VALID padding
+    if (i >= maskRadius && i < height - maskRadius && j >= maskRadius && j < width - maskRadius) {
+        for (int k = 0; k < imageChannels; k++) { // Iterate over R, G, B channels
+            float accum = 0.0f;
             
-            // Convolve with mask
+            // Apply convolution mask
             for (int y = -maskRadius; y <= maskRadius; y++) {
                 for (int x = -maskRadius; x <= maskRadius; x++) {
-                    // Calculate input position
                     int xOffset = j + x;
                     int yOffset = i + y;
                     
-                    // Boundary check for input
-                    if (xOffset >= 0 && xOffset < width && yOffset >= 0 && yOffset < height) {
-                        // Get input pixel at offset position for this channel
-                        int inputIdx = (yOffset * width + xOffset) * imageChannels + k;
-                        int imagePixel = inputData[inputIdx];
-                        
-                        // Get corresponding mask value
-                        int maskIdx = (y + maskRadius) * maskWidth + (x + maskRadius);
-                        int maskValue = maskData[maskIdx];
-                        
-                        // Accumulate
-                        accum += imagePixel * maskValue;
-                    }
+                    // Compute index for input and mask
+                    int inputIdx = (yOffset * width + xOffset) * imageChannels + k;
+                    int maskIdx = (y + maskRadius) * maskWidth + (x + maskRadius);
+                    
+                    // Accumulate weighted sum
+                    accum += inputData[inputIdx] * maskData[maskIdx];
                 }
             }
             
-            // Write output
-            int outIdx = (outRow * (width / stride) + outCol) * imageChannels + k;
-            outputData[outIdx] = clamp(accum, 0, 255); // Assuming 8-bit integers
+            // Store result in output array (Clamp between 0 and 1 as per instructions)
+            int outIdx = (i * width + j) * imageChannels + k;
+            outputData[outIdx] = clamp(accum, 0.0f, 1.0f);
         }
     }
 }
