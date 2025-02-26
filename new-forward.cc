@@ -100,7 +100,7 @@ void OpenCLInterface::conv_forward_opencl(cl_mem device_y, const cl_mem device_x
     //size_t localSize[3] = { TILE_WIDTH, TILE_WIDTH, 1 };
 
     size_t localSize[3] = {TILE_WIDTH, TILE_WIDTH, 1}; // 16x16x1 → 256 threads
-    size_t globalSize[3] = {W_out, H_out, B * M};
+    size_t globalSize[3] = {M,Y,B}
 
     //@@ Launch the OpenCL Kernel here
     // Execute the OpenCL kernel on the array
