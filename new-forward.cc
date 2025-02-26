@@ -43,11 +43,11 @@ void OpenCLInterface::conv_forward_opencl_prolog(const float *host_y, const floa
 
     //@@ Copy memory to the OpenCL here
     // Copy input vectors to memory buffers
-    err = clEnqueueWriteBuffer(this->opencl->queue, device_x, CL_TRUE, 0, size_t x_size, host_x, 0, NULL, NULL);
+    err = clEnqueueWriteBuffer(this->opencl->queue, device_x, CL_TRUE, 0, x_size, host_x, 0, NULL, NULL);
 
     CHECK_ERR(err, "Copying host_x to device");
 
-    err = clEnqueueWriteBuffer(this->opencl->queue, device_k, CL_TRUE, 0, size_t k_size, host_k, 0, NULL, NULL);
+    err = clEnqueueWriteBuffer(this->opencl->queue, device_k, CL_TRUE, 0, k_size, host_k, 0, NULL, NULL);
 
     CHECK_ERR(err, "Copying host_k to device");
 }
@@ -109,7 +109,7 @@ void OpenCLInterface::conv_forward_opencl(cl_mem device_y, const cl_mem device_x
 
 void OpenCLInterface::conv_forward_opencl_epilog(float *host_y, cl_mem device_y, cl_mem device_x, cl_mem device_k, const int B, const int M, const int C, const int H, const int W, const int K)
 {
-
+    cl_int err;
     //@@ Copy the output back to host
     size_t y_size = B * M * (H - K + 1) * (W - K + 1) * sizeof(float);
     err = clEnqueueReadBuffer(this->opencl->queue, device_y, CL_TRUE, 0, y_size, host_y, 0, NULL, NULL);
