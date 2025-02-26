@@ -96,7 +96,7 @@ void OpenCLInterface::conv_forward_opencl(cl_mem device_y, const cl_mem device_x
 
     int Y = H_grid * W_grid;
     // Define global and local work sizes
-    size_t globalSize[3] = {(size_t)M, (size_t)Y, (size_t)B}};
+    size_t globalSize[3] = {(size_t)M, (size_t)Y, (size_t)B};
     size_t localSize[3] = { TILE_WIDTH, TILE_WIDTH, 1 };
 
 
