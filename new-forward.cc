@@ -91,13 +91,16 @@ void OpenCLInterface::conv_forward_opencl(cl_mem device_y, const cl_mem device_x
     CHECK_ERR(err, "clSetKernelArg for K");
 
 
-    size_t globalWorkSize[3] = {static_cast<size_t>(B), static_cast<size_t>(M), static_cast<size_t>(H * W)};
-    size_t localWorkSize[3] = {1, 1, TILE_WIDTH};
+    size_t globalWorkSize[2] = {static_cast<size_t>(ceil(B/(float)TILE_WIDTH) * TILE_WIDTH), 
+        static_cast<size_t>(ceil(M/(float)TILE_WIDTH) * TILE_WIDTH)};
+    size_t localWorkSize[2] = {TILE_WIDTH, TILE_WIDTH};
+
+
 
     //@@ Launch the OpenCL Kernel here
     // Execute the OpenCL kernel on the array
 
-    err = clEnqueueNDRangeKernel(this->opencl->queue, this->opencl->kernel, 3, nullptr,globalWorkSize , localWorkSize, 0, nullptr, nullptr);
+    err = clEnqueueNDRangeKernel(this->opencl->queue, this->opencl->kernel, 2, nullptr, globalWorkSize, localWorkSize, 0, nullptr, nullptr);
     CHECK_ERR(err, "clEnqueueNDRangeKernel");
 }
 
