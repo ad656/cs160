@@ -25,11 +25,11 @@ void OpenCLInterface::conv_forward_opencl_prolog(const float *host_y, const floa
     CHECK_ERR(err, "clCreateBuffer y");
 
     size_t x_size = B * C * H * W * sizeof(float);
-    *device_x = clCreateBuffer(this->opencl->context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, x_size, (void*)host_x, &err);
+    *device_x = clCreateBuffer(this->opencl->context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, x_size, (void*)host_x, &err);
     CHECK_ERR(err, "clCreateBuffer x");
 
     size_t k_size = M * C * K * K * sizeof(float);
-    *device_k = clCreateBuffer(this->opencl->context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, k_size, (void*)host_k, &err);
+    *device_k = clCreateBuffer(this->opencl->context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, k_size, (void*)host_k, &err);
     CHECK_ERR(err, "clCreateBuffer k");
     // Create memory buffers for input and output vectors
     // 
@@ -90,13 +90,13 @@ void OpenCLInterface::conv_forward_opencl(cl_mem device_y, const cl_mem device_x
 
     int H_out = H - K + 1;
     int W_out = W - K + 1;
+    
+    int W_grid = ceil(W_out*1.0/TILE_WIDTH); 	
+    int H_grid = ceil(H_out*1.0/TILE_WIDTH);
 
+    int Y = H_grid * W_grid;
     // Define global and local work sizes
-    size_t globalSize[3] = {
-        (size_t)((W_out + TILE_WIDTH - 1) / TILE_WIDTH) * TILE_WIDTH,
-        (size_t)((H_out + TILE_WIDTH - 1) / TILE_WIDTH) * TILE_WIDTH,
-        (size_t)(M * B)
-    };
+    size_t globalSize[3] = {(size_t)M, (size_t)Y, (size_t)B}};
     size_t localSize[3] = { TILE_WIDTH, TILE_WIDTH, 1 };
 
 
