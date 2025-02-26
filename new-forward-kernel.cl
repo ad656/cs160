@@ -6,15 +6,6 @@ __kernel void conv_forward_kernel(__global float *y, __global float *x, __consta
 
      const int H_out = H - K + 1;
     const int W_out = W - K + 1;
-
-    const int w = get_global_id(0);
-    const int h = get_global_id(1);
-    const int m = get_global_id(2) % M;
-    const int b = get_global_id(2) / M;
-
-    if (w >= W_out || h >= H_out || m >= M || b >= B)
-        return;
-
   // We have some nice #defs for you below to simplify indexing. Feel free to use them, or create your own.
 #define y4d(i3, i2, i1, i0) y[(i3) * (M * H_out * W_out) + (i2) * (H_out * W_out) + (i1) * (W_out) + i0]
 #define x4d(i3, i2, i1, i0) x[(i3) * (C * H * W) + (i2) * (H * W) + (i1) * (W) + i0]
