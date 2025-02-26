@@ -22,7 +22,7 @@ __kernel void conv_forward_kernel(__global float *y, __global float *x, __consta
 
     
 
-    int W_grid = ceil(W_out*1.0/TILE_WIDTH); 	// number of horizontal tiles per output map
+    int W_grid = (W_out + TILE_WIDTH-1)/(TILE_WIDTH) 	// number of horizontal tiles per output map
 
     int b = blockIdx.z;
     int m = blockIdx.x;
