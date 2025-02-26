@@ -17,7 +17,10 @@
 	
 void OpenCLInterface::conv_forward_opencl_prolog(const float *host_y, const float *host_x, const float *host_k, cl_mem *device_y, cl_mem *device_x, cl_mem *device_k, const int B, const int M, const int C, const int H, const int W, const int K)
 {
-
+    cl_int err;
+    size_t size_y = B * M * H * W * sizeof(float);
+    size_t size_x = B * C * H * W * sizeof(float);
+    size_t size_k = M * C * K * K * sizeof(float);
     //@@ Allocate OpenCL memory here
     *device_y = clCreateBuffer(this->opencl->context, CL_MEM_READ_WRITE, size_y, nullptr, &err);
     CHECK_ERR(err, "clCreateBuffer for device_y");
@@ -101,7 +104,8 @@ void OpenCLInterface::conv_forward_opencl(cl_mem device_y, const cl_mem device_x
 
 void OpenCLInterface::conv_forward_opencl_epilog(float *host_y, cl_mem device_y, cl_mem device_x, cl_mem device_k, const int B, const int M, const int C, const int H, const int W, const int K)
 {
-
+    cl_int err;
+    size_t size_y = B * M * H * W * sizeof(float);
     //@@ Copy the output back to host
 
     err = clEnqueueReadBuffer(this->opencl->queue, device_y, CL_TRUE, 0, size_y, host_y, 0, nullptr, nullptr);
