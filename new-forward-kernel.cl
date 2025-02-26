@@ -1,3 +1,4 @@
+#include <cl_math>
 #define TILE_WIDTH 16
 #define KERNEL_SZ 7
 
@@ -21,7 +22,9 @@ __kernel void conv_forward_kernel(__global float *y, __constant float *x, __cons
 #define k4d(i3, i2, i1, i0) k[(i3) * (C * K * K) + (i2) * (K * K) + (i1) * (K) + i0]
 
     
-int W_grid = ceil(W_out*1.0/TILE_WIDTH); 	// number of horizontal tiles per output map
+int W_grid = (W_out + TILE_WIDTH-1)/TILE_WIDTH;
+
+	
 
     int b = blockIdx.z;
     int m = blockIdx.x;
@@ -30,8 +33,8 @@ int W_grid = ceil(W_out*1.0/TILE_WIDTH); 	// number of horizontal tiles per outp
     
     float acc = 0.;
     if (h < H_out && w < W_out) {
-        for (int c = 0;  c < C; c++) {		// sum over all input channels
-            for (int p = 0; p < K; p++) {		// loop over KxK  filter
+        for (int c = 0;  c < C; c++) {		
+            for (int p = 0; p < K; p++) {		
                 for (int q = 0; q < K; q++)  {
                     acc += x4d(b, c, h+p, w+q) * k4d(m, c, p, q);
                 }
