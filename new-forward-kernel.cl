@@ -22,21 +22,25 @@ __kernel void conv_forward_kernel(__global float *y, __global float *x, __consta
 
     
 
-    for (int b = 0; b < B; b++) {
-      for (int m = 0; m < M; m++) {
-        for (int h = 0; h < H_out; h++) {
-            for (int w = 0; w < W_out; w++) {
-                y4d(b, m, h, w) = 0;
-                for (int c = 0; c < C; c++) {
-                    for (int p = 0; p < K; p++) {
-                      for (int q = 0; q < K; q++) {
-                        y4d(b, m, h, w) += x4d(b, c, h+p, w+q) * k4d(m, c, p, q);
-                      }
-                    }
+    int W_grid = ceil(W_out*1.0/TILE_WIDTH); 	// number of horizontal tiles per output map
+
+    int b = blockIdx.z;
+    int m = blockIdx.x;
+    int h = (blockIdx.y / W_grid) * TILE_WIDTH + threadIdx.y;
+    int w = (blockIdx.y % W_grid) * TILE_WIDTH + threadIdx.x;
+    
+    float acc = 0.;
+    if (h < H_out && w < W_out) {
+        for (int c = 0;  c < C; c++) {		// sum over all input channels
+            for (int p = 0; p < K; p++) {		// loop over KxK  filter
+                for (int q = 0; q < K; q++)  {
+                    acc += x4d(b, c, h+p, w+q) * k4d(m, c, p, q);
                 }
             }
         }
-      }
+        y4d(b, m, h, w) = acc;
+    } else {
+        return;
     }
 
 #undef y4d
