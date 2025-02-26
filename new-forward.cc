@@ -25,11 +25,11 @@ void OpenCLInterface::conv_forward_opencl_prolog(const float *host_y, const floa
     CHECK_ERR(err, "clCreateBuffer y");
 
     size_t x_size = B * C * H * W * sizeof(float);
-    *device_x = clCreateBuffer(this->opencl->context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, x_size, (void*)host_x, &err);
+    *device_x = clCreateBuffer(this->opencl->context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, x_size, (void*)host_x, &err);
     CHECK_ERR(err, "clCreateBuffer x");
 
     size_t k_size = M * C * K * K * sizeof(float);
-    *device_k = clCreateBuffer(this->opencl->context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, k_size, (void*)host_k, &err);
+    *device_k = clCreateBuffer(this->opencl->context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, k_size, (void*)host_k, &err);
     CHECK_ERR(err, "clCreateBuffer k");
     // Create memory buffers for input and output vectors
     // 
@@ -99,12 +99,8 @@ void OpenCLInterface::conv_forward_opencl(cl_mem device_y, const cl_mem device_x
     //size_t globalSize[3] = {(size_t)M, (size_t)Y, (size_t)B};
     //size_t localSize[3] = { TILE_WIDTH, TILE_WIDTH, 1 };
 
-    size_t globalSize[3] = {
-        ((M + TILE_WIDTH - 1) / TILE_WIDTH) * TILE_WIDTH,          // M rounded up
-        ((W_out * H_out + TILE_WIDTH*TILE_WIDTH - 1) / (TILE_WIDTH*TILE_WIDTH)) * TILE_WIDTH*TILE_WIDTH, // H*W space
-        ((B + 1 - 1) / 1) * 1                                      // B rounded up (trivial)
-    };
-    size_t localSize[3] = {TILE_WIDTH, TILE_WIDTH*TILE_WIDTH, 1};
+    size_t localSize[3] = {TILE_WIDTH, TILE_WIDTH, 1}; // 16x16x1 → 256 threads
+    size_t globalSize[3] = {W_out, H_out, B * M};
 
     //@@ Launch the OpenCL Kernel here
     // Execute the OpenCL kernel on the array
