@@ -1,7 +1,7 @@
 #define TILE_WIDTH 16
 #define KERNEL_SZ 7
 
-__kernel void conv_forward_kernel(__global float *y, __global float *x, __constant float *k, 
+__kernel void conv_forward_kernel(__global float *y, __global float *x, __global float *k, 
                               const int B, const int M, const int C, const int H, const int W, const int K) {
     const int H_out = H - K + 1;
     const int W_out = W - K + 1;
