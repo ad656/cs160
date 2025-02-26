@@ -49,7 +49,7 @@ __kernel void conv_forward_kernel(__global float *y, __global float *x, __consta
         }
     }
             
-    y4d(b, m, h_out, w_out) = acc;
+    y4d(b, m, h, w) = acc;
 
     #undef y4d
     #undef x4d
