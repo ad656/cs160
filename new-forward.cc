@@ -96,9 +96,15 @@ void OpenCLInterface::conv_forward_opencl(cl_mem device_y, const cl_mem device_x
 
     int Y = H_grid * W_grid;
     // Define global and local work sizes
-    size_t globalSize[3] = {(size_t)M, (size_t)Y, (size_t)B};
-    size_t localSize[3] = { TILE_WIDTH, TILE_WIDTH, 1 };
+    //size_t globalSize[3] = {(size_t)M, (size_t)Y, (size_t)B};
+    //size_t localSize[3] = { TILE_WIDTH, TILE_WIDTH, 1 };
 
+    size_t globalSize[3] = {
+        ((M + TILE_WIDTH - 1) / TILE_WIDTH) * TILE_WIDTH,          // M rounded up
+        ((W_out * H_out + TILE_WIDTH*TILE_WIDTH - 1) / (TILE_WIDTH*TILE_WIDTH)) * TILE_WIDTH*TILE_WIDTH, // H*W space
+        ((B + 1 - 1) / 1) * 1                                      // B rounded up (trivial)
+    };
+    size_t localSize[3] = {TILE_WIDTH, TILE_WIDTH*TILE_WIDTH, 1};
 
     //@@ Launch the OpenCL Kernel here
     // Execute the OpenCL kernel on the array
