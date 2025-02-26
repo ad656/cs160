@@ -4,33 +4,24 @@
 __kernel void conv_forward_kernel(__global float *y, __global float *x, __constant float *k, 
                                   const int B, const int M, const int C, const int H, const int W, const int K) {
 
-     const int H_out = H - K + 1;
-    const int W_out = W - K + 1;
-  // We have some nice #defs for you below to simplify indexing. Feel free to use them, or create your own.
-#define y4d(i3, i2, i1, i0) y[(i3) * (M * H_out * W_out) + (i2) * (H_out * W_out) + (i1) * (W_out) + i0]
-#define x4d(i3, i2, i1, i0) x[(i3) * (C * H * W) + (i2) * (H * W) + (i1) * (W) + i0]
-#define k4d(i3, i2, i1, i0) k[(i3) * (C * K * K) + (i2) * (K * K) + (i1) * (K) + i0]
+    int W_out = W - K + 1;
+    int H_out = H - K + 1;
 
-  // Insert your CPU convolution kernel code here
+    int b = get_global_id(2);  // Batch index
+    int m = get_global_id(0);  // Output channel (M)
+    int h = get_global_id(1) / W_out; // Row index
+    int w = get_global_id(1) % W_out; // Column index
 
-    for (int b = 0; b < B; b++) {
-      for (int m = 0; m < M; m++) {
-        for (int h = 0; h < H_out; h++) {
-            for (int w = 0; w < W_out; w++) {
-                y4d(b, m, h, w) = 0;
-                for (int c = 0; c < C; c++) {
-                    for (int p = 0; p < K; p++) {
-                      for (int q = 0; q < K; q++) {
-                        y4d(b, m, h, w) += x4d(b, c, h+p, w+q) * k4d(m, c, p, q);
-                      }
-                    }
+    if (b < B && m < M && h < H_out && w < W_out) {
+        float sum = 0.0f;
+        for (int c = 0; c < C; c++) {
+            for (int p = 0; p < K; p++) {
+                for (int q = 0; q < K; q++) {
+                    sum += x[(b * C * H * W) + (c * H * W) + ((h + p) * W) + (w + q)] * 
+                           k[(m * C * K * K) + (c * K * K) + (p * K) + q];
                 }
             }
         }
-      }
+        y[(b * M * H_out * W_out) + (m * H_out * W_out) + (h * W_out) + w] = sum;
     }
-#undef y4d
-#undef x4d
-#undef k4d
-
 }
