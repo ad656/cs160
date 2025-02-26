@@ -1,4 +1,4 @@
-#define TILE_WIDTH 16
+]#define TILE_WIDTH 16
 #define KERNEL_SZ 7
 
 __kernel void do_not_remove_this_kernel() {
@@ -20,27 +20,22 @@ __kernel void conv_forward_kernel(__global float *y, __constant float *x, __cons
     int W_out = W - K + 1;
     int H_out = H - K + 1;
 
-    int w = get_global_id(0);
-    int h = get_global_id(1);
-    int m_b = get_global_id(2);
-
-    int b = m_b / M;
-    int m = m_b % M;
-
-    if (w >= W_out || h >= H_out || b >= B || m >= M)
-        return;
-
-    float sum = 0.0f;
-
-    for (int c = 0; c < C; ++c) {
-        for (int p = 0; p < K; ++p) {
-            for (int q = 0; q < K; ++q) {
-                sum += x4d(b, c, h + p, w + q) * k4d(m, c, p, q);
+    for (int b = 0; b < B; b++) {
+      for (int m = 0; m < M; m++) {
+        for (int h = 0; h < H_out; h++) {
+            for (int w = 0; w < W_out; w++) {
+                y4d(b, m, h, w) = 0;
+                for (int c = 0; c < C; c++) {
+                    for (int p = 0; p < K; p++) {
+                      for (int q = 0; q < K; q++) {
+                        y4d(b, m, h, w) += x4d(b, c, h+p, w+q) * k4d(m, c, p, q);
+                      }
+                    }
+                }
             }
         }
+      }
     }
-
-    y4d(b, m, h, w) = sum;
 
 #undef y4d
 #undef x4d
