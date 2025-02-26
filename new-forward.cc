@@ -101,9 +101,9 @@ void OpenCLInterface::conv_forward_opencl(cl_mem device_y, const cl_mem device_x
 
     size_t localSize[3] = {TILE_WIDTH, TILE_WIDTH, 1}; // 16x16x1 → 256 threads
     size_t globalSize[3] = {
-        ((M + TILE_WIDTH - 1) / TILE_WIDTH) * TILE_WIDTH,
-        ((Y + TILE_WIDTH - 1) / TILE_WIDTH) * TILE_WIDTH,
-        (size_t)B
+        ((W_out + TILE_WIDTH - 1) / TILE_WIDTH) * TILE_WIDTH,  // Width dimension
+        ((H_out + TILE_WIDTH - 1) / TILE_WIDTH) * TILE_WIDTH,  // Height dimension
+        (size_t)(B * M)  // Combined batch and output feature dimension
     };
 
     //@@ Launch the OpenCL Kernel here
