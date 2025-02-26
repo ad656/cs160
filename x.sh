@@ -10,18 +10,18 @@ git pull || { echo "Git pull failed"; exit 1; }
 
 # Step 3: Wait for 3 seconds
 echo "Waiting for 3 seconds..."
-sleep 3
+sleep 2
 
 # Step 4: Change directory back to parent
 echo "Changing directory back to parent..."
 cd .. || { echo "Failed to cd into parent directory"; exit 1; }
 
-# Step 5: Copy main.c to cse160-WI25/PA5
-echo "Copying main.c to cse160-WI25/PA5..."
-cp cs160/main.c cse160-WI25/PA5 || { echo "Failed to copy main.c"; exit 1; }
 
-# Step 6: Copy kernel.cl to cse160-WI25/PA5
-echo "Copying kernel.cl to cse160-WI25/PA5..."
-cp cs160/kernel.cl cse160-WI25/PA5 || { echo "Failed to copy kernel.cl"; exit 1; }
+echo "Copying new-forward-kernel to cse160-WI25/PA6..."
+cp cs160/new-forward-kernel.cl cse160-WI25/PA6/src/layer/custom/ || { echo "Failed to copy new-forward-kernel.cl"; exit 1; }
+
+
+echo "Copying new-forward.cc to cse160-WI25/PA6..."
+cp cs160/new-forward.cc cse160-WI25/PA6/src/layer/custom/ || { echo "Failed to copy new-forward.cc"; exit 1; }
 
 echo "All steps completed successfully!"
