@@ -11,7 +11,7 @@ __kernel void prefn_marker_kernel() {
     tx = tx + 1;
 }
 
-__kernel void conv_forward_kernel(__global float *y, __constant float *x, __constant float *k, const int B, const int M, const int C, const int H, const int W, const int K) 
+__kernel void conv_forward_kernel(__global float *y, __global float *x, __constant float *k, const int B, const int M, const int C, const int H, const int W, const int K) 
 {
     const int H_out = H - K + 1;
     const int W_out = W - K + 1;
@@ -36,11 +36,11 @@ __kernel void conv_forward_kernel(__global float *y, __constant float *x, __cons
     for(int b = 0; b<B;b++){
         for (int m = 0; m< M; m++){
             for(int h = 0; h < H_out; h++){
-                for(int w = 0; w<W_out;w++){
+                for(int w = 0; w < W_out;w++){
                     for (int c = 0; c < C; c++) {
                         for (int p = 0; p < K; p++) {
                             for (int q = 0; q < K; q++) {
-                                acc += x4d(b, c, h_out+p, w_out+q) * k4d(m, c, p, q);
+                                acc += x4d(b, c, h+p, w+q) * k4d(m, c, p, q);
                             }
                         }
                     }
