@@ -39,9 +39,9 @@ void OpenCLInterface::conv_forward_gemm_opencl_prolog(
     *device_x_unroll = clCreateBuffer(opencl->context, CL_MEM_READ_WRITE, x_unroll_size, NULL, &err);
     CHECK_ERR(err, "clCreateBuffer device_x_unroll");
 
-    enqueue_write_buffer(opencl->queue, *device_x, CL_TRUE, 0, x_size, host_x, 0, NULL, NULL);
+    clEnqueue_write_buffer(opencl->queue, *device_x, CL_TRUE, 0, x_size, host_x, 0, NULL, NULL);
 
-    enqueue_write_buffer(opencl->queue, *device_k, CL_TRUE, 0, k_size, host_k, 0, NULL, NULL);
+    clEnqueue_write_buffer(opencl->queue, *device_k, CL_TRUE, 0, k_size, host_k, 0, NULL, NULL);
 }
 
 void OpenCLInterface::conv_forward_gemm_opencl(
@@ -72,8 +72,8 @@ void OpenCLInterface::conv_forward_gemm_opencl(
     CHECK_ERR(err, "clEnqueueNDRangeKernel im2col");
 
     // GEMM operation using clBLAST
-    auto alpha = vector<float>(B,1.0f);  // Initialize with B elements set to 1.0
-    auto beta = vector<float>(B,0.0f);   // Initialize with B elements set to 0.0
+    auto alpha = std::vector<float>(B,1.0f);  // Initialize with B elements set to 1.0
+    auto beta = std::vector<float>(B,0.0f);   // Initialize with B elements set to 0.0
 
 
     std::vector<size_t> a_offsets(B), b_offsets(B), c_offsets(B);
@@ -85,10 +85,10 @@ void OpenCLInterface::conv_forward_gemm_opencl(
     //GEMM = alpha * A * B + beta * C
     //a = m * c * k * k
     //b = 
-    GemmBatched(
-        Layout::kRowMajor, 
-        Transpose::kNo, 
-        Transpose::kNo,
+    clblast::GemmBatched(
+        clblast::Layout::kRowMajor, 
+        clblast::Transpose::kNo, 
+        clblast::Transpose::kNo,
         M, 
         (W-K+1)*(H-K+1), 
         C * K * K,
