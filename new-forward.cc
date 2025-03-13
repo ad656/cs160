@@ -27,12 +27,7 @@ void OpenCLInterface::conv_forward_gemm_opencl_prolog(
     size_t k_size = sizeof(float) * M * C * K * K;
     size_t x_unroll_size = sizeof(float) * B * C * K * K * (H - K + 1) * (W - K + 1);
 
-    context = clCreateContext(0, 1, &device_id, NULL, NULL, &err);
-    CHECK_ERR(err, "clCreateContext");
-
-    queue = clCreateCommandQueueWithProperties(context, device_id, 0, &err);
-    kernel = clCreateKernel(program, "im2col", &err);
-    program = clCreateProgramWithSource(context, 1, (const char **)&kernel_source, NULL, &err);
+    
     CHECK_ERR(err, "clCreateProgramWithSource");
     *device_x = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, x_size, (void *)host_x, &err);
     CHECK_ERR(err, "clCreateBuffer device_x");
@@ -53,7 +48,12 @@ void OpenCLInterface::conv_forward_gemm_opencl(
     const cl_mem device_x_unroll, const int B, const int M, 
     const int C, const int H, const int W, const int K) 
 
-    
+    context = clCreateContext(0, 1, &device_id, NULL, NULL, &err);
+    CHECK_ERR(err, "clCreateContext");
+
+    queue = clCreateCommandQueueWithProperties(context, device_id, 0, &err);
+    kernel = clCreateKernel(program, "im2col", &err);
+    program = clCreateProgramWithSource(context, 1, (const char **)&kernel_source, NULL, &err);
 {
     cl_int err;
     const int H_out = H - K + 1;
