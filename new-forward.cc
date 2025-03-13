@@ -3,7 +3,7 @@
 #include <vector>
 
 #include <clblast.h>
-
+#define TILE_SIZE 16
 #include "kernel.h"
 #include "device.h"
 
