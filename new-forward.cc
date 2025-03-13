@@ -25,7 +25,7 @@ void OpenCLInterface::conv_forward_gemm_opencl_prolog(
     size_t x_size = sizeof(float) * B * C * H * W; // input_size * sizeoffloat
     size_t y_size = sizeof(float) * B * M * H * W; 
     size_t k_size = sizeof(float) * M * C * K * K;
-    size_t x_unroll_size = sizeof(float) * B * C * K * K * (H - K + 1) * (W - K + 1);
+    size_t x_unroll_size = sizeof(float)  * C * K * K * (H - K + 1) * (W - K + 1);
 
     *device_x = clCreateBuffer(opencl->context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, x_size, (void *)host_x, &err);
     CHECK_ERR(err, "clCreateBuffer device_x");
