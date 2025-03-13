@@ -19,14 +19,8 @@
 void OpenCLInterface::conv_forward_gemm_opencl_prolog(
     const float *host_y, const float *host_x, const float *host_k, 
     cl_mem *device_y, cl_mem *device_x, cl_mem *device_k, cl_mem *device_x_unroll, 
-    
     const int B, const int M, const int C, const int H, const int W, const int K) 
 {
-    cl_context context;        // context
-    cl_command_queue queue;    // command queue
-    cl_program program;        // program
-    cl_kernel kernel;  
-
     cl_int err;
     size_t x_size = sizeof(float) * B * C * H * W;
     size_t y_size = sizeof(float) * B * M * (H - K + 1) * (W - K + 1);
@@ -54,14 +48,33 @@ void OpenCLInterface::conv_forward_gemm_opencl(
     const cl_mem device_x_unroll, const int B, const int M, 
     const int C, const int H, const int W, const int K) 
 
+    
+{
+    cl_context context;        // context
+    cl_command_queue queue;    // command queue
+    cl_program program;        // program
+    cl_kernel kernel;  
+    cl_int err;
+
     context = clCreateContext(0, 1, &device_id, NULL, NULL, &err);
     CHECK_ERR(err, "clCreateContext");
 
+    // Create a command queue
     queue = clCreateCommandQueueWithProperties(context, device_id, 0, &err);
-    kernel = clCreateKernel(program, "im2col", &err);
+    CHECK_ERR(err, "clCreateCommandQueueWithProperties");
+
+    // Create the program from the source buffer
     program = clCreateProgramWithSource(context, 1, (const char **)&kernel_source, NULL, &err);
-{
-    cl_int err;
+    CHECK_ERR(err, "clCreateProgramWithSource");
+
+    // Build the program executable
+    err = clBuildProgram(program, 0, NULL, NULL, NULL, NULL);
+    CHECK_ERR(err, "clBuildProgram");
+
+    // Create the compute kernel in the program we wish to run
+    kernel = clCreateKernel(program, "im2col", &err);
+    CHECK_ERR(err, "clCreateKernel");
+
     const int H_out = H - K + 1;
     const int W_out = W - K + 1;
     const int unrolled_width = H_out * W_out;
