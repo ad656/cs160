@@ -1,4 +1,4 @@
-\#include <cmath>
+#include <cmath>
 #include <iostream>
 #include <vector>
 
@@ -27,6 +27,7 @@ void OpenCLInterface::conv_forward_gemm_opencl_prolog(
     size_t k_size = sizeof(float) * M * C * K * K;
     size_t x_unroll_size = sizeof(float) * B * C * K * K * (H - K + 1) * (W - K + 1);
 
+    kernel = clCreateKernel(program, "im2col", &err);
     *device_x = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, x_size, (void *)host_x, &err);
     CHECK_ERR(err, "clCreateBuffer device_x");
 
@@ -57,17 +58,17 @@ void OpenCLInterface::conv_forward_gemm_opencl(
     size_t local_size_im2col[3] = {1, 1, TILE_WIDTH}; // TILE_WIDTH = 16
 
     // Set Kernel Arguments for im2col
-    err = clSetKernelArg(kernel_im2col, 0, sizeof(cl_mem), &device_x_unroll);
-    err |= clSetKernelArg(kernel_im2col, 1, sizeof(cl_mem), &device_x);
-    err |= clSetKernelArg(kernel_im2col, 2, sizeof(int), &B);
-    err |= clSetKernelArg(kernel_im2col, 3, sizeof(int), &C);
-    err |= clSetKernelArg(kernel_im2col, 4, sizeof(int), &H);
-    err |= clSetKernelArg(kernel_im2col, 5, sizeof(int), &W);
-    err |= clSetKernelArg(kernel_im2col, 6, sizeof(int), &K);
+    err = clSetKernelArg(kernel, 0, sizeof(cl_mem), &device_x_unroll);
+    err |= clSetKernelArg(kernel, 1, sizeof(cl_mem), &device_x);
+    err |= clSetKernelArg(kernel, 2, sizeof(int), &B);
+    err |= clSetKernelArg(kernel, 3, sizeof(int), &C);
+    err |= clSetKernelArg(kernel, 4, sizeof(int), &H);
+    err |= clSetKernelArg(kernel, 5, sizeof(int), &W);
+    err |= clSetKernelArg(kernel, 6, sizeof(int), &K);
     CHECK_ERR(err, "clSetKernelArg kernel_im2col");
 
     // Launch im2col kernel
-    err = clEnqueueNDRangeKernel(queue, kernel, 3, NULL, global_size_im2col, local_size_im2col, 0, NULL, NULL);
+    err = clEnqueueNDRangeKernel(queue,kernel, 3, NULL, global_size_im2col, local_size_im2col, 0, NULL, NULL);
     CHECK_ERR(err, "clEnqueueNDRangeKernel im2col");
 
     // GEMM operation using clBLAST
