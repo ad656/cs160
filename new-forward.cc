@@ -19,8 +19,14 @@
 void OpenCLInterface::conv_forward_gemm_opencl_prolog(
     const float *host_y, const float *host_x, const float *host_k, 
     cl_mem *device_y, cl_mem *device_x, cl_mem *device_k, cl_mem *device_x_unroll, 
+    
     const int B, const int M, const int C, const int H, const int W, const int K) 
 {
+    cl_context context;        // context
+    cl_command_queue queue;    // command queue
+    cl_program program;        // program
+    cl_kernel kernel;  
+
     cl_int err;
     size_t x_size = sizeof(float) * B * C * H * W;
     size_t y_size = sizeof(float) * B * M * (H - K + 1) * (W - K + 1);
