@@ -1,4 +1,4 @@
-#include <cmath>
+\#include <cmath>
 #include <iostream>
 #include <vector>
 
@@ -67,7 +67,7 @@ void OpenCLInterface::conv_forward_gemm_opencl(
     CHECK_ERR(err, "clSetKernelArg kernel_im2col");
 
     // Launch im2col kernel
-    err = clEnqueueNDRangeKernel(queue, kernel_im2col, 3, NULL, global_size_im2col, local_size_im2col, 0, NULL, NULL);
+    err = clEnqueueNDRangeKernel(queue, kernel, 3, NULL, global_size_im2col, local_size_im2col, 0, NULL, NULL);
     CHECK_ERR(err, "clEnqueueNDRangeKernel im2col");
 
     // GEMM operation using clBLAST
