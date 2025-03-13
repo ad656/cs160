@@ -76,12 +76,7 @@ void OpenCLInterface::conv_forward_opencl(cl_mem device_y, const cl_mem device_x
     float alpha = 1.0f;
     float beta = 0.0f;
 
-    // Reshape the input and kernel into the right format for GEMM
-    // Matrix A (reshaped x) - input buffer
-    // Matrix B (reshaped k) - kernel buffer
-    // Matrix C (output y) - output buffer
-
-    // Reshape input and kernel for GEMM (not shown, but this involves creating a flattened matrix for input and kernel)
+    // Reshape input and kernel into the right format for GEMM (not shown, but this involves creating a flattened matrix for input and kernel)
     cl_mem reshaped_x = device_x;  // Assume reshaped_x buffer already created
     cl_mem reshaped_k = device_k;  // Assume reshaped_k buffer already created
     cl_mem reshaped_y = device_y;  // Output buffer
