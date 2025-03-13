@@ -56,7 +56,7 @@ void OpenCLInterface::conv_forward_opencl_prolog(const float *host_y, const floa
 
 void OpenCLInterface::conv_forward_opencl(cl_mem device_y, const cl_mem device_x, const cl_mem device_k, const int B, const int M, const int C, const int H, const int W, const int K)
 {
-    cl_int err;
+    clblast::StatusCode err;
 
     // Calculate output dimensions
     int H_out = H - K + 1;
