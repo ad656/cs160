@@ -1,7 +1,7 @@
 #include <cmath>
 #include <iostream>
 #include <vector>
-
+#define TILE_WIDTH 16
 #include <clblast.h>
 
 #include "kernel.h"
@@ -77,16 +77,19 @@ void OpenCLInterface::conv_forward_gemm_opencl(
     CHECK_ERR(err, "clEnqueueNDRangeKernel im2col");
 
     // GEMM operation using clBLAST
+    float alpha = 1.0f;
+    float beta = 0.0f;
+
     clblast::GemmBatched<float>(
         clblast::Layout::kRowMajor, clblast::Transpose::kNo, clblast::Transpose::kNo,
         M, unrolled_width, unrolled_height,
-        1.0,
+        &alpha,  // ✅ Pass a float pointer instead of double
         device_k, 0, unrolled_height,
         device_x_unroll, 0, unrolled_width,
-        0.0,
+        &beta,  // ✅ Pass a float pointer instead of double
         device_y, 0, unrolled_width,
         B, &opencl->queue, nullptr);
-}
+    }
 
 void OpenCLInterface::conv_forward_gemm_opencl_epilog(
     float *host_y, cl_mem device_y, cl_mem device_x, cl_mem device_k, 
