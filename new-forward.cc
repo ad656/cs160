@@ -1,3 +1,20 @@
+#include <cmath>
+#include <iostream>
+#include <vector>
+
+#include <clblast.h>
+
+#include "kernel.h"
+#include "device.h"
+
+#include "opencl-new-forward.h"
+
+#define CHECK_ERR(err, msg)                            \
+    if (err != CL_SUCCESS)                             \
+    {                                                  \
+        fprintf(stderr, "%s failed: %d.\n", msg, err); \
+        exit(EXIT_FAILURE);                            \
+    }
 void OpenCLInterface::conv_forward_gemm_opencl_prolog(
     const float *host_y, const float *host_x, const float *host_k, 
     cl_mem *device_y, cl_mem *device_x, cl_mem *device_k, cl_mem *device_x_unroll, 
