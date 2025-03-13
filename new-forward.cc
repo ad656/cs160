@@ -67,8 +67,8 @@ void OpenCLInterface::conv_forward_gemm_opencl(
     CHECK_ERR(err, "clEnqueueNDRangeKernel im2col");
 
     // GEMM operation using clBLAST
-    std::vector<float> alphas(B, 1.0f);  // Initialize with B elements set to 1.0
-    std::vector<float> betas(B, 0.0f);   // Initialize with B elements set to 0.0
+    std::vector<float> alpha(B, 1.0f);  // Initialize with B elements set to 1.0
+    std::vector<float> beta(B, 0.0f);   // Initialize with B elements set to 0.0
 
 
     std::vector<size_t> a_offsets(B), b_offsets(B), c_offsets(B);
