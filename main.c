@@ -3,9 +3,10 @@
 #include <math.h>
 #include <libgen.h>
 #include <string.h>
+#include <CL/cl.h>
+#include <clblast.h>
 
 #include "device.h"
-#include "kernel.h"
 #include "matrix.h"
 #include "img.h"
 
@@ -16,138 +17,83 @@
         exit(EXIT_FAILURE);                           \
     }
 
-#define KERNEL_PATH "kernel.cl"
-
-#define COMPUTE_OUTUT_DIM(input_dim, kernel_size, stride) \
+#define COMPUTE_OUTPUT_DIM(input_dim, kernel_size, stride) \
     ((input_dim - kernel_size) / stride + 1)
 
-void OpenCLConvolution2D(Image *input0, Matrix *input1, Image *result, int stride)
+void CLBlastConvolution2D(Image *input0, Matrix *input1, Image *result, int stride)
 {
-    // Load external OpenCL kernel code
-    char *kernel_source = OclLoadKernel(KERNEL_PATH); // Load kernel source
-
-    // Device input and output buffers
-    cl_mem device_a, device_b, device_c;
-
     cl_int err;
+    cl_device_id device_id;
+    cl_context context;
+    cl_command_queue queue;
 
-    cl_device_id device_id;    // device ID
-    cl_context context;        // context
-    cl_command_queue queue;    // command queue
-    cl_program program;        // program
-    cl_kernel kernel;          // kernel
-
-    // Find platforms and devices
-    OclPlatformProp *platforms = NULL;
-    cl_uint num_platforms;
-
-    err = OclFindPlatforms((const OclPlatformProp **)&platforms, &num_platforms);
-    CHECK_ERR(err, "OclFindPlatforms");
-
-    // Get the ID for the specified kind of device type.
+    // Get OpenCL device and context
     err = OclGetDeviceWithFallback(&device_id, OCL_DEVICE_TYPE);
     CHECK_ERR(err, "OclGetDeviceWithFallback");
 
-    // Create a context
     context = clCreateContext(0, 1, &device_id, NULL, NULL, &err);
     CHECK_ERR(err, "clCreateContext");
 
-    // Create a command queue
     queue = clCreateCommandQueueWithProperties(context, device_id, 0, &err);
     CHECK_ERR(err, "clCreateCommandQueueWithProperties");
 
-    // Create the program from the source buffer
-    program = clCreateProgramWithSource(context, 1, (const char **)&kernel_source, NULL, &err);
-    CHECK_ERR(err, "clCreateProgramWithSource");
-
-    // Build the program executable
-    err = clBuildProgram(program, 0, NULL, NULL, NULL, NULL);
-    CHECK_ERR(err, "clBuildProgram");
-
-    // Create the compute kernel in the program we wish to run
-    kernel = clCreateKernel(program, "convolution2D", &err);
-    CHECK_ERR(err, "clCreateKernel");
-
-    //@@ Allocate GPU memory here
-
-    device_a = clCreateBuffer(context, CL_MEM_READ_ONLY, 
-                             sizeof(int) * input0->shape[0] * input0->shape[1] * IMAGE_CHANNELS, 
-                             NULL, &err);
+    // Allocate OpenCL memory buffers
+    cl_mem device_a = clCreateBuffer(context, CL_MEM_READ_ONLY, 
+                                     sizeof(float) * input0->shape[0] * input0->shape[1] * IMAGE_CHANNELS, 
+                                     NULL, &err);
     CHECK_ERR(err, "clCreateBuffer device_a");
-    
-    device_b = clCreateBuffer(context, CL_MEM_READ_ONLY,
-                             sizeof(float) * input1->shape[0] * input1->shape[1],
-                             NULL, &err);
+
+    cl_mem device_b = clCreateBuffer(context, CL_MEM_READ_ONLY, 
+                                     sizeof(float) * input1->shape[0] * input1->shape[1], 
+                                     NULL, &err);
     CHECK_ERR(err, "clCreateBuffer device_b");
-    
-    device_c = clCreateBuffer(context, CL_MEM_WRITE_ONLY,
-                             sizeof(int) * result->shape[0] * result->shape[1] * IMAGE_CHANNELS,
-                             NULL, &err);
+
+    cl_mem device_c = clCreateBuffer(context, CL_MEM_WRITE_ONLY, 
+                                     sizeof(float) * result->shape[0] * result->shape[1] * IMAGE_CHANNELS, 
+                                     NULL, &err);
     CHECK_ERR(err, "clCreateBuffer device_c");
 
-    //@@ Copy memory to the GPU here
-
+    // Copy data to GPU
     err = clEnqueueWriteBuffer(queue, device_a, CL_TRUE, 0,
-                              sizeof(int) * input0->shape[0] * input0->shape[1] * IMAGE_CHANNELS,
-                              input0->data, 0, NULL, NULL);
+                               sizeof(float) * input0->shape[0] * input0->shape[1] * IMAGE_CHANNELS,
+                               input0->data, 0, NULL, NULL);
     CHECK_ERR(err, "clEnqueueWriteBuffer device_a");
-    
+
     err = clEnqueueWriteBuffer(queue, device_b, CL_TRUE, 0,
-                              sizeof(float) * input1->shape[0] * input1->shape[1],
-                              input1->data, 0, NULL, NULL);
+                               sizeof(float) * input1->shape[0] * input1->shape[1],
+                               input1->data, 0, NULL, NULL);
     CHECK_ERR(err, "clEnqueueWriteBuffer device_b");
 
-    // Set the arguments to our compute kernel
-    // __global float * inputData, __global float * outputData, __constant float * maskData,
-    // int width, int height, int maskWidth,  int imageChannels
-    err = clSetKernelArg(kernel, 0, sizeof(cl_mem), &device_a);
-    CHECK_ERR(err, "clSetKernelArg 0");
-    err |= clSetKernelArg(kernel, 1, sizeof(cl_mem), &device_c);
-    CHECK_ERR(err, "clSetKernelArg 1");
-    err |= clSetKernelArg(kernel, 2, sizeof(cl_mem), &device_b);
-    CHECK_ERR(err, "clSetKernelArg 2");
-    err |= clSetKernelArg(kernel, 3, sizeof(unsigned int), &input0->shape[1]);
-    CHECK_ERR(err, "clSetKernelArg 3");
-    err |= clSetKernelArg(kernel, 4, sizeof(unsigned int), &input0->shape[0]);
-    CHECK_ERR(err, "clSetKernelArg 4");
-    err |= clSetKernelArg(kernel, 5, sizeof(unsigned int), &input1->shape[0]);
-    CHECK_ERR(err, "clSetKernelArg 5");
-    int imageChannels = IMAGE_CHANNELS;
-    err |= clSetKernelArg(kernel, 6, sizeof(unsigned int), &imageChannels);
-    CHECK_ERR(err, "clSetKernelArg 6");
-    err |= clSetKernelArg(kernel, 7, sizeof(unsigned int), &stride);
-    CHECK_ERR(err, "clSetKernelArg 7");
+    // Perform batched GEMM using CLBlast
+    const size_t batch_count = IMAGE_CHANNELS;
+    const size_t m = result->shape[0] * result->shape[1];
+    const size_t n = 1;
+    const size_t k = input1->shape[0] * input1->shape[1];
+    const float alpha = 1.0f;
+    const float beta = 0.0f;
 
-    // Compute the output dim 
-    // @@ define local and global work sizes
-    // Execute the OpenCL kernel on the list
-    
-    size_t localWorkSize[2] = {16, 16};  // Typical work group size
-    size_t globalWorkSize[2] = {
-        ((result->shape[1] + localWorkSize[0] - 1) / localWorkSize[0]) * localWorkSize[0],
-        ((result->shape[0] + localWorkSize[1] - 1) / localWorkSize[1]) * localWorkSize[1]
-    };
+    err = CLBlastSgemmBatched(CLBlastLayoutRowMajor, CLBlastTransposeNo, CLBlastTransposeNo,
+                              m, n, k, alpha,
+                              device_a, 0, k,
+                              device_b, 0, n,
+                              beta,
+                              device_c, 0, n,
+                              batch_count,
+                              &queue, NULL);
+    CHECK_ERR(err, "CLBlastSgemmBatched");
 
-    //@@ Launch the GPU Kernel here
-    // Execute the OpenCL kernel on the array
-
-    err = clEnqueueNDRangeKernel(queue, kernel, 2, NULL, globalWorkSize, localWorkSize, 0, NULL, NULL);
-    CHECK_ERR(err, "clEnqueueNDRangeKernel");
-
-    //@@ Copy the GPU memory back to the CPU here
-    // Read the memory buffer output_mem_obj to the local variable result
-
+    // Copy result back to host
     err = clEnqueueReadBuffer(queue, device_c, CL_TRUE, 0,
-                             sizeof(int) * result->shape[0] * result->shape[1] * IMAGE_CHANNELS,
-                             result->data, 0, NULL, NULL);
+                              sizeof(float) * result->shape[0] * result->shape[1] * IMAGE_CHANNELS,
+                              result->data, 0, NULL, NULL);
     CHECK_ERR(err, "clEnqueueReadBuffer device_c");
-    
-    //@@ Free the GPU memory here
-    // Release OpenCL resources
 
+    // Cleanup
     clReleaseMemObject(device_a);
     clReleaseMemObject(device_b);
     clReleaseMemObject(device_c);
+    clReleaseCommandQueue(queue);
+    clReleaseContext(context);
 }
 
 int main(int argc, char *argv[])
@@ -161,54 +107,38 @@ int main(int argc, char *argv[])
     const char *input_file_a = argv[1];
     const char *input_file_b = argv[2];
     const char *input_file_c = argv[3];
-    const char *input_file_d = argv[4];
+    const char *output_file = argv[4];
 
-    // get the dir from the input file
-    int stride;
     char dir[256];
-    strcpy(dir, dirname(strdup(input_file_a))); 
+    strcpy(dir, dirname(strdup(input_file_a)));
 
-    // Host input and output vectors and sizes
+    int stride;
+    LoadStride(dir, &stride);
+
     Image host_a, host_c, answer;
     Matrix host_b;
-    
-    cl_int err;
 
-    err = LoadImgRaw(input_file_a, &host_a);
-    CHECK_ERR(err, "LoadImg");
+    LoadImgRaw(input_file_a, &host_a);
+    LoadMatrix(input_file_b, &host_b);
+    LoadImgRaw(input_file_c, &answer);
 
-    err = LoadMatrix(input_file_b, &host_b);
-    CHECK_ERR(err, "LoadMatrix");
+    int rows = COMPUTE_OUTPUT_DIM(host_a.shape[0], host_b.shape[0], stride);
+    int cols = COMPUTE_OUTPUT_DIM(host_a.shape[1], host_b.shape[0], stride);
 
-    // err = LoadImgTmp(input_file_c, &answer);
-    err = LoadImgRaw(input_file_c, &answer);
-    CHECK_ERR(err, "LoadImg");
-
-    // Load stride
-    err = LoadStride(dir, &stride);
-    CHECK_ERR(err, "LoadStride");
-
-    int rows, cols;
-    //@@ Update these values for the output rows and cols of the output
-    //@@ Do not use the results from the answer image
-    rows = COMPUTE_OUTUT_DIM(host_a.shape[0], host_b.shape[0], stride);
-    cols = COMPUTE_OUTUT_DIM(host_a.shape[1], host_b.shape[0], stride);
-    
-    // Allocate the memory for the target.
     host_c.shape[0] = rows;
     host_c.shape[1] = cols;
-    host_c.data = (int *)malloc(sizeof(int) * host_c.shape[0] * host_c.shape[1] * IMAGE_CHANNELS);
+    host_c.data = (float *)malloc(sizeof(float) * host_c.shape[0] * host_c.shape[1] * IMAGE_CHANNELS);
 
-    OpenCLConvolution2D(&host_a, &host_b, &host_c, stride);
+    CLBlastConvolution2D(&host_a, &host_b, &host_c, stride);
 
-    // Save the image
-    SaveImg(input_file_d, &host_c);
+    SaveImg(output_file, &host_c);
 
-    // Check the result of the convolution
-    err = CheckImg(&answer, &host_c);
-    CHECK_ERR(err, "CheckImg");
+    if (CheckImg(&answer, &host_c) != CL_SUCCESS)
+    {
+        fprintf(stderr, "Image check failed.\n");
+        return -1;
+    }
 
-    // Release host memory
     free(host_a.data);
     free(host_b.data);
     free(host_c.data);
