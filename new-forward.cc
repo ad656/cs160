@@ -22,7 +22,7 @@ void OpenCLInterface::conv_forward_gemm_opencl_prolog(
     const int B, const int M, const int C, const int H, const int W, const int K) 
 {
     
-
+    cl_int err;
     size_t x_size = sizeof(float) * B * C * H * W;
     size_t y_size = sizeof(float) * B * M * (H - K + 1) * (W - K + 1);
     size_t k_size = sizeof(float) * M * C * K * K;
@@ -39,7 +39,7 @@ void OpenCLInterface::conv_forward_gemm_opencl_prolog(
     *device_y = clCreateBuffer(opencl ->context, CL_MEM_WRITE_ONLY, y_size, NULL, &err);
     CHECK_ERR(err, "clCreateBuffer device_y");
 
-    *device_x_unroll = clCreateBuffer(context, CL_MEM_READ_WRITE, x_unroll_size, NULL, &err);
+    *device_x_unroll = clCreateBuffer(opencl->context, CL_MEM_READ_WRITE, x_unroll_size, NULL, &err);
     CHECK_ERR(err, "clCreateBuffer device_x_unroll");
 }
 
@@ -85,7 +85,7 @@ void OpenCLInterface::conv_forward_gemm_opencl(
         device_x_unroll, 0, unrolled_width,
         0.0f,
         device_y, 0, unrolled_width,
-        B, &queue, nullptr);
+        B, &opencl->queue, nullptr);
 }
 
 void OpenCLInterface::conv_forward_gemm_opencl_epilog(
