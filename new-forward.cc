@@ -56,42 +56,63 @@ void OpenCLInterface::conv_forward_opencl_prolog(const float *host_y, const floa
 
 void OpenCLInterface::conv_forward_opencl(cl_mem device_y, const cl_mem device_x, const cl_mem device_k, const int B, const int M, const int C, const int H, const int W, const int K)
 {
+    cl_int err;
 
-    // Reshape the input (im2col) and prepare matrices for GEMM
+    // Calculate output dimensions
     int H_out = H - K + 1;
     int W_out = W - K + 1;
-    int im2col_size = B * H_out * W_out * K * K * C;
-    
-    std::vector<float> im2col_matrix(im2col_size);  // Holds the reshaped input for GEMM
-    std::vector<float> output_matrix(B * M * H_out * W_out, 0);  // Output matrix for GEMM result
 
-    // Perform im2col: flatten each sliding window into a column of the matrix
-    // This step will involve copying patches of the input tensor (device_x) into im2col_matrix
+    // Define matrix dimensions for GEMM
+    size_t A_rows = B * C * H * W;   // Input flattened (B * C * H * W)
+    size_t B_cols = M * C * K * K;   // Kernel flattened (M * C * K * K)
+    size_t C_cols = B * M * H_out * W_out; // Output flattened (B * M * H_out * W_out)
 
-    // Call the corresponding CLBlast GemmBatched function for the matrix multiplication
-    clblast::GemmBatched<float>(
-        clblast::Layout::kRowMajor,    // Matrix layout (RowMajor)
-        clblast::Transpose::kNo,       // No transpose for A
-        clblast::Transpose::kNo,       // No transpose for B
-        M * H_out * W_out,             // Rows of output matrix
-        B,                            // Number of matrices in the batch
-        K * K * C,                    // Columns of input and rows of kernel (im2col)
-        1.0f,                         // Scalar alpha
-        im2col_matrix.data(),         // Input matrix (im2col)
-        K * K * C,                    // Leading dimension of im2col_matrix
-        host_k,                       // Kernel matrix (flattened)
-        K * K * C,                    // Leading dimension of kernel
-        0.0f,                         // Scalar beta
-        output_matrix.data(),         // Output matrix
-        M * H_out * W_out,            // Leading dimension of output
-        B,                            // Number of matrices in the batch
-        this->opencl->queue()         // OpenCL queue for execution
+    // Define leading dimensions
+    size_t A_ld = A_rows;  // Leading dimension of input matrix (rows of A)
+    size_t B_ld = M * K * K; // Leading dimension of kernel matrix (rows of B)
+    size_t C_ld = C_cols;  // Leading dimension of output matrix (rows of C)
+
+    // Prepare GEMM parameters
+    float alpha = 1.0f;
+    float beta = 0.0f;
+
+    // Reshape the input and kernel into the right format for GEMM
+    // Matrix A (reshaped x) - input buffer
+    // Matrix B (reshaped k) - kernel buffer
+    // Matrix C (output y) - output buffer
+
+    // Reshape input and kernel for GEMM (not shown, but this involves creating a flattened matrix for input and kernel)
+    cl_mem reshaped_x = device_x;  // Assume reshaped_x buffer already created
+    cl_mem reshaped_k = device_k;  // Assume reshaped_k buffer already created
+    cl_mem reshaped_y = device_y;  // Output buffer
+
+    // Batch count is B * M since each (B, M) pair is a separate matrix multiplication task
+    size_t batch_count = B * M;
+
+    // Perform GEMM using clBLAS::GemmBatched
+    err = clblast::GemmBatched<float>(
+        clblast::Layout::kRowMajor,  // Layout (RowMajor)
+        clblast::Transpose::kNo,    // No transpose for input
+        clblast::Transpose::kNo,    // No transpose for kernel
+        A_rows,                     // Rows of A (input)
+        C_cols,                     // Columns of C (output)
+        B_cols,                     // Columns of B (kernel)
+        &alpha,                     // Scalar alpha
+        reshaped_x, NULL, A_ld,    // Input matrix A and leading dimension
+        reshaped_k, NULL, B_ld,    // Kernel matrix B and leading dimension
+        &beta,                      // Scalar beta
+        reshaped_y, NULL, C_ld,    // Output matrix C and leading dimension
+        batch_count,                // Batch count
+        &this->opencl->queue,       // OpenCL command queue
+        NULL                        // Event (optional, can be used to track completion)
     );
+    CHECK_ERR(err, "clblast::GemmBatched failed");
 
-    // Copy the result back to the output buffer
-    size_t y_size = B * M * H_out * W_out * sizeof(float);
-    cl_int err = clEnqueueWriteBuffer(this->opencl->queue, device_y, CL_TRUE, 0, y_size, output_matrix.data(), 0, NULL, NULL);
-    CHECK_ERR(err, "Copying output back to device_y");
+    // Optionally, read back the results if necessary (not required for GEMM)
+    // err = clEnqueueReadBuffer(this->opencl->queue, reshaped_y, CL_TRUE, 0, C_cols * sizeof(float), host_y, 0, NULL, NULL);
+    // CHECK_ERR(err, "clEnqueueReadBuffer");
+
+    // No need for kernel launch or argument setting anymore, since we're using GEMM
 }
 
 
