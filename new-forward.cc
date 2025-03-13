@@ -9,7 +9,12 @@
 
 #define TILE_WIDTH 16
 
-
+#define CHECK_ERR(err, msg)                           \
+    if (err != clblast::StatusCode::kSuccess)         \
+    {                                                 \
+        fprintf(stderr, "%s failed: %d.\n", msg, static_cast<int>(err)); \
+        exit(EXIT_FAILURE);                           \
+    }
 	
 void OpenCLInterface::conv_forward_opencl_prolog(const float *host_y, const float *host_x, const float *host_k, cl_mem *device_y, cl_mem *device_x, cl_mem *device_k, const int B, const int M, const int C, const int H, const int W, const int K)
 {
@@ -96,7 +101,7 @@ void OpenCLInterface::conv_forward_opencl(cl_mem device_y, const cl_mem device_x
         &this->opencl->queue,       // OpenCL command queue
         NULL                        // Event (optional, can be used to track completion)
     );
-    CHECK_ERR(err, "clblast::GemmBatched failed");
+    
 
     // Optionally, read back the results if necessary (not required for GEMM)
     // err = clEnqueueReadBuffer(this->opencl->queue, reshaped_y, CL_TRUE, 0, C_cols * sizeof(float), host_y, 0, NULL, NULL);
