@@ -35,10 +35,8 @@ for (int mask_offset_col = 0; mask_offset_col < K; mask_offset_col++) {
 // it contributes to based on the filter position
 
 // row_o = row_i - mask_offset_row
-int row_o = row_i - mask_offset_row;
-
-// col_o = col_i - mask_offset_col
-int col_o = col_i - mask_offset_col;
+int row_o = row_i + mask_offset_row - (K-1);
+int col_o = col_i + mask_offset_col - (K-1);
 
 // Check if the output indices are within bounds
 bool row_o_in_bounds = (0 <= row_o && row_o < H_out);
