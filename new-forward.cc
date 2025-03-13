@@ -21,8 +21,9 @@ void OpenCLInterface::conv_forward_gemm_opencl_prolog(
     const int B, const int M, const int C, const int H, const int W, const int K) 
 {
     cl_int err;
-    size_t x_size = sizeof(float) * B * C * H * W;
-    size_t y_size = sizeof(float) * B * M * (H - K + 1) * (W - K + 1);
+    
+    size_t x_size = sizeof(float) * B * C * H * W; // input_size * sizeoffloat
+    size_t y_size = sizeof(float) * B * M * H * W; 
     size_t k_size = sizeof(float) * M * C * K * K;
     size_t x_unroll_size = sizeof(float) * B * C * K * K * (H - K + 1) * (W - K + 1);
 
@@ -37,6 +38,10 @@ void OpenCLInterface::conv_forward_gemm_opencl_prolog(
 
     *device_x_unroll = clCreateBuffer(opencl->context, CL_MEM_READ_WRITE, x_unroll_size, NULL, &err);
     CHECK_ERR(err, "clCreateBuffer device_x_unroll");
+
+    enqueue_write_buffer(opencl->queue, *device_x, CL_TRUE, 0, x_size, host_x, 0, NULL, NULL);
+
+    enqueue_write_buffer(opencl->queue, *device_k, CL_TRUE, 0, k_size, host_k, 0, NULL, NULL);
 }
 
 void OpenCLInterface::conv_forward_gemm_opencl(
@@ -49,7 +54,7 @@ void OpenCLInterface::conv_forward_gemm_opencl(
     const int W_out = W - K + 1;
 
     
-    size_t global_size_im2col[3] = {(size_t)B, (size_t)C, (size_t)H};
+    size_t global_size_im2col[3] = {W, H, B*C};
     size_t local_size_im2col[3] = {1, 1, TILE_WIDTH};
  
     // Set Kernel Arguments for im2col
@@ -67,8 +72,8 @@ void OpenCLInterface::conv_forward_gemm_opencl(
     CHECK_ERR(err, "clEnqueueNDRangeKernel im2col");
 
     // GEMM operation using clBLAST
-    std::vector<float> alpha(B, 1.0f);  // Initialize with B elements set to 1.0
-    std::vector<float> beta(B, 0.0f);   // Initialize with B elements set to 0.0
+    auto alpha = vector<float>(B,1.0f);  // Initialize with B elements set to 1.0
+    auto beta = vector<float>(B,0.0f);   // Initialize with B elements set to 0.0
 
 
     std::vector<size_t> a_offsets(B), b_offsets(B), c_offsets(B);
@@ -77,16 +82,30 @@ void OpenCLInterface::conv_forward_gemm_opencl(
         b_offsets[i] = i * (C * K * K) * (H_out * W_out);
         c_offsets[i] = i * M * (H_out * W_out);
     }
-
-    clblast::GemmBatched<float>(
-        clblast::Layout::kRowMajor, clblast::Transpose::kNo, clblast::Transpose::kNo,
-        M, H_out * W_out, C * K * K,
+    //GEMM = alpha * A * B + beta * C
+    //a = m * c * k * k
+    //b = 
+    GemmBatched(
+        Layout::kRowMajor, 
+        Transpose::kNo, 
+        Transpose::kNo,
+        M, 
+        (W-K+1)*(H-K+1), 
+        C * K * K,
         alpha.data(),
-        device_k, 0, C * K * K,
-        device_x_unroll, 0, H_out * W_out,
+        device_k,
+        0, 
+        C * K * K,
+        device_x_unroll, 
+        0, 
+        H_out * W_out,
         beta.data(),
-        device_y, 0, H_out * W_out,
-        B, &opencl->queue, nullptr);
+        device_y, 
+        0, 
+        H_out * W_out,
+        B, 
+        &opencl->queue, 
+        nullptr);
 }
 
 void OpenCLInterface::conv_forward_gemm_opencl_epilog(
