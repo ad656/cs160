@@ -52,7 +52,7 @@ void OpenCLInterface::conv_forward_gemm_opencl(
     
 {
     
-
+    cl_int err;
     const int H_out = H - K + 1;
     const int W_out = W - K + 1;
     const int unrolled_width = H_out * W_out;
@@ -80,10 +80,10 @@ void OpenCLInterface::conv_forward_gemm_opencl(
     clblast::GemmBatched<float>(
         clblast::Layout::kRowMajor, clblast::Transpose::kNo, clblast::Transpose::kNo,
         M, unrolled_width, unrolled_height,
-        1.0f,
+        1.0,
         device_k, 0, unrolled_height,
         device_x_unroll, 0, unrolled_width,
-        0.0f,
+        0.0,
         device_y, 0, unrolled_width,
         B, &opencl->queue, nullptr);
 }
