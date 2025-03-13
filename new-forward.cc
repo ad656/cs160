@@ -10,9 +10,9 @@
 #define TILE_WIDTH 16
 
 #define CHECK_ERR(err, msg)                           \
-    if (err != clblast::StatusCode::kSuccess)         \
+    if (err != CL_SUCCESS)                            \
     {                                                 \
-        fprintf(stderr, "%s failed: %d.\n", msg, static_cast<int>(err)); \
+        fprintf(stderr, "%s failed: %d.\n", msg, err); \
         exit(EXIT_FAILURE);                           \
     }
 	
@@ -56,7 +56,7 @@ void OpenCLInterface::conv_forward_opencl_prolog(const float *host_y, const floa
 
 void OpenCLInterface::conv_forward_opencl(cl_mem device_y, const cl_mem device_x, const cl_mem device_k, const int B, const int M, const int C, const int H, const int W, const int K)
 {
-    clblast::StatusCode err;
+    clblast::StatusCode erff;
 
     // Calculate output dimensions
     int H_out = H - K + 1;
@@ -85,7 +85,7 @@ void OpenCLInterface::conv_forward_opencl(cl_mem device_y, const cl_mem device_x
     size_t batch_count = B * M;
 
     // Perform GEMM using clBLAS::GemmBatched
-    err = clblast::GemmBatched<float>(
+    erff = clblast::GemmBatched<float>(
         clblast::Layout::kRowMajor,  // Layout (RowMajor)
         clblast::Transpose::kNo,    // No transpose for input
         clblast::Transpose::kNo,    // No transpose for kernel
