@@ -81,17 +81,17 @@ void OpenCLInterface::conv_forward_gemm_opencl(
 
 
     std::vector<size_t> a_offsets(B), b_offsets(B), c_offsets(B);
-    /*for (int i = 0; i < B; i++) {
+    for (int i = 0; i < B; i++) {
         a_offsets[i] = i * M * (C * K * K);
         b_offsets[i] = i * (C * K * K) * (H_out * W_out);
         c_offsets[i] = i * M * (H_out * W_out);
-    }*/
+    }
 
-    for (int i = 0; i < B; i++) {
+    /*for (int i = 0; i < B; i++) {
         a_offsets[i] = 0;  // No batch dimension in weights
         b_offsets[i] = i * (C * K * K) * (H_out * W_out);
         c_offsets[i] = i * M * (H_out * W_out);
-    }
+    }*/
     //GEMM = alpha * A * B + beta * C
     //a = m * c * k * k
     //b = 
