@@ -80,7 +80,7 @@ void OpenCLInterface::conv_forward_gemm_opencl(
     std::vector<size_t> a_offsets(B), b_offsets(B), c_offsets(B);
     for (int i = 0; i < B; i++) {
         a_offsets[i] = i * M * (C * K * K);
-        b_offsets[i] = i * (C * K * K) * (H_out * W_out) * B;
+        b_offsets[i] = i * (C * K * K) * (H_out * W_out);
         c_offsets[i] = i * M * (H_out * W_out);
     }
     //GEMM = alpha * A * B + beta * C
@@ -120,6 +120,7 @@ void OpenCLInterface::conv_forward_gemm_opencl_epilog(
     CHECK_ERR(err, "clEnqueueReadBuffer device_y");
 
     clReleaseMemObject(device_x);
-    clReleaseMemObject(device_k);
+    clReleaseMemObject(device_k);.
+    clReleaseMemObject(device_y);
     clReleaseMemObject(device_x_unroll);
 }
