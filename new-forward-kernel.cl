@@ -1,53 +1,125 @@
-__kernel void im2col(__global float *unrolled, __global float *x, const int B,
-    const int C_in, const int H, const int W, const int K) {
-// Define macros for easy indexing
-#define x4d(i3, i2, i1, i0) \
-x[(i3) * (C_in * H * W) + (i2) * (H * W) + (i1) * (W) + (i0)]
+#include <cmath>
+#include <iostream>
+#include <vector>
 
-// Define the unrolled dimensions
-// This will be correct for K=2 even if K=3 is passed
-const int actual_K = 2;  // Hardcode to 2 to match test cases
-const int H_out = H - actual_K + 1;
-const int W_out = W - actual_K + 1;
-const int W_unroll = H_out * W_out;
+#include <clblast.h>
+#define TILE_WIDTH 16
+#include "kernel.h"
+#include "device.h"
 
-// Define macro for unrolled indexing
-#define x_unroll_3d(i2, i1, i0) \
-unrolled[((i2) * (C_in * actual_K * actual_K) + (i1)) * W_unroll + (i0)]
+#include "opencl-new-forward.h"
 
-// Get thread indices
-const int col_i = get_global_id(0);    // Column index in input
-const int row_i = get_global_id(1);    // Row index in input
-const int bc_idx = get_global_id(2);   // Batch and channel index
-const int b = bc_idx / C_in;           // Batch index
-const int c_in = bc_idx % C_in;        // Channel index
+#define CHECK_ERR(err, msg)                            \
+    if (err != CL_SUCCESS)                             \
+    {                                                  \
+        fprintf(stderr, "%s failed: %d.\n", msg, err); \
+        exit(EXIT_FAILURE);                            \
+    }
+void OpenCLInterface::conv_forward_gemm_opencl_prolog(
+    const float *host_y, const float *host_x, const float *host_k, 
+    cl_mem *device_y, cl_mem *device_x, cl_mem *device_k, cl_mem *device_x_unroll, 
+    const int B, const int M, const int C, const int H, const int W, const int K) 
+{
+    cl_int err;
+    const int H_out = H - K + 1;
+    const int W_out = W - K + 1;
+    size_t x_size = sizeof(float) * B * C * H * W; // input_size * sizeoffloat
+    size_t y_size = sizeof(float) * B * M * H_out * W_out; 
+    size_t k_size = sizeof(float) * M * C * K * K;
+    size_t x_unroll_size = sizeof(float) * B * C * K * K * (H - K + 1) * (W - K + 1);
 
-// Only process if we're within bounds
-if (b < B && c_in < C_in && row_i < H && col_i < W) {
-// For each position in the filter
-for (int mask_offset_row = 0; mask_offset_row < actual_K; mask_offset_row++) {
-for (int mask_offset_col = 0; mask_offset_col < actual_K; mask_offset_col++) {
-// Calculate output position
-int row_o = row_i + mask_offset_row - (actual_K-1);
-int col_o = col_i + mask_offset_col - (actual_K-1);
+    *device_x = clCreateBuffer(opencl->context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, x_size, (void *)host_x, &err);
+    CHECK_ERR(err, "clCreateBuffer device_x");
 
-// Check if the output indices are within bounds
-bool row_o_in_bounds = (0 <= row_o && row_o < H_out);
-bool col_o_in_bounds = (0 <= col_o && col_o < W_out);
+    *device_k = clCreateBuffer(opencl->context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, k_size, (void *)host_k, &err);
+    CHECK_ERR(err, "clCreateBuffer device_k");
 
-if (row_o_in_bounds && col_o_in_bounds) {
-   // Calculate the unrolled matrix indices
-   int row_u = c_in * actual_K * actual_K + mask_offset_row * actual_K + mask_offset_col;
-   int col_u = row_o * W_out + col_o;
-   
-   // Set the value in the unrolled matrix
-   int unroll_idx = b * (C_in * actual_K * actual_K * W_unroll) + row_u * W_unroll + col_u;
-   unrolled[unroll_idx] = x4d(b, c_in, row_i, col_i);
-}
-}
-}
+    *device_y = clCreateBuffer(opencl->context, CL_MEM_WRITE_ONLY, y_size, NULL, &err);
+    CHECK_ERR(err, "clCreateBuffer device_y");
+
+    *device_x_unroll = clCreateBuffer(opencl->context, CL_MEM_READ_WRITE, x_unroll_size, NULL, &err);
+    CHECK_ERR(err, "clCreateBuffer device_x_unroll");
+
+    //clEnqueueWriteBuffer(opencl->queue, *device_x, CL_TRUE, 0, x_size, host_x, 0, NULL, NULL);
+
+    //clEnqueueWriteBuffer(opencl->queue, *device_k, CL_TRUE, 0, k_size, host_k, 0, NULL, NULL);
 }
 
-#undef x4d
-#undef x_unroll_3d
+void OpenCLInterface::conv_forward_gemm_opencl(
+    cl_mem device_y, const cl_mem device_x, const cl_mem device_k, 
+    const cl_mem device_x_unroll, const int B, const int M, 
+    const int C, const int H, const int W, const int K) 
+{
+    cl_int err;
+    const int H_out = H - K + 1;
+    const int W_out = W - K + 1;
+
+    
+    size_t global_size_im2col[3] = {(size_t)W_out, (size_t)H_out, (size_t)(B*C)};
+    size_t local_size_im2col[3] = {16, 16, 1}; 
+ 
+    // Set Kernel Arguments for im2col
+    err = clSetKernelArg(opencl->im2col_kernel, 0, sizeof(cl_mem), &device_x_unroll);
+    err |= clSetKernelArg(opencl->im2col_kernel, 1, sizeof(cl_mem), &device_x);
+    err |= clSetKernelArg(opencl->im2col_kernel, 2, sizeof(int), &B);
+    err |= clSetKernelArg(opencl->im2col_kernel, 3, sizeof(int), &C);
+    err |= clSetKernelArg(opencl->im2col_kernel, 4, sizeof(int), &H);
+    err |= clSetKernelArg(opencl->im2col_kernel, 5, sizeof(int), &W);
+    err |= clSetKernelArg(opencl->im2col_kernel, 6, sizeof(int), &K);
+    CHECK_ERR(err, "clSetKernelArg kernel_im2col");
+
+    // Launch im2col kernel
+    err = clEnqueueNDRangeKernel(opencl->queue, opencl->im2col_kernel, 3, NULL, global_size_im2col, local_size_im2col, 0, NULL, NULL);
+    CHECK_ERR(err, "clEnqueueNDRangeKernel im2col");
+
+    // GEMM operation using clBLAST
+    auto alpha = std::vector<float>(B,1.0f);  // Initialize with B elements set to 1.0
+    auto beta = std::vector<float>(B,0.0f);   // Initialize with B elements set to 0.0
+
+
+    std::vector<size_t> a_offsets(B), b_offsets(B), c_offsets(B);
+    for (int i = 0; i < B; i++) {
+        a_offsets[i] = i * M * (C * K * K);
+        b_offsets[i] = i * (C * K * K) * (H_out * W_out);
+        c_offsets[i] = i * M * (H_out * W_out);
+    }
+    //GEMM = alpha * A * B + beta * C
+    //a = m * c * k * k
+    //b = 
+    clblast::GemmBatched(
+        clblast::Layout::kRowMajor, 
+        clblast::Transpose::kNo, 
+        clblast::Transpose::kNo,
+        M, 
+        (W-K+1)*(H-K+1), 
+        C * K * K,
+        alpha.data(),
+        device_k,
+        0, 
+        C * K * K,
+        device_x_unroll, 
+        0, 
+        H_out * W_out,
+        beta.data(),
+        device_y, 
+        0, 
+        H_out * W_out,
+        B, 
+        &opencl->queue, 
+        nullptr);
+}
+
+void OpenCLInterface::conv_forward_gemm_opencl_epilog(
+    float *host_y, cl_mem device_y, cl_mem device_x, cl_mem device_k, 
+    cl_mem device_x_unroll, const int B, const int M, 
+    const int C, const int H, const int W, const int K) 
+{
+    cl_int err;
+    size_t y_size = sizeof(float) * B * M * (H - K + 1) * (W - K + 1);
+    err = clEnqueueReadBuffer(opencl->queue, device_y, CL_TRUE, 0, y_size, host_y, 0, NULL, NULL);
+    CHECK_ERR(err, "clEnqueueReadBuffer device_y");
+
+    clReleaseMemObject(device_x);
+    clReleaseMemObject(device_k);
+    clReleaseMemObject(device_x_unroll);
 }
