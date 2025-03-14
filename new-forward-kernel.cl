@@ -1,7 +1,7 @@
 #define TILE_WIDTH 16
 #define KERNEL_SZ 7
 
-___kernel void im2col(__global float *unrolled, __global float *x, const int B,
+__kernel void im2col(__global float *unrolled, __global float *x, const int B,
     const int C_in, const int H, const int W, const int K) {
 // Get output coordinates
 const int col_o = get_global_id(0);  // Column in output
