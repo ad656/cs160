@@ -54,10 +54,9 @@ void OpenCLInterface::conv_forward_gemm_opencl(
     const int H_out = H - K + 1;
     const int W_out = W - K + 1;
 
-    
     size_t global_size_im2col[3] = {
-        ((size_t)W_out + 15) / 16 * 16,  // Round up to multiple of 16
-        ((size_t)H_out + 15) / 16 * 16,  // Round up to multiple of 16
+        ((size_t)W + 15) / 16 * 16,  // Based on input width
+        ((size_t)H + 15) / 16 * 16,  // Based on input height
         (size_t)(B*C)
     };
     size_t local_size_im2col[3] = {16, 16, 1}; 
@@ -82,8 +81,14 @@ void OpenCLInterface::conv_forward_gemm_opencl(
 
 
     std::vector<size_t> a_offsets(B), b_offsets(B), c_offsets(B);
-    for (int i = 0; i < B; i++) {
+    /*for (int i = 0; i < B; i++) {
         a_offsets[i] = i * M * (C * K * K);
+        b_offsets[i] = i * (C * K * K) * (H_out * W_out);
+        c_offsets[i] = i * M * (H_out * W_out);
+    }*/
+
+    for (int i = 0; i < B; i++) {
+        a_offsets[i] = 0;  // No batch dimension in weights
         b_offsets[i] = i * (C * K * K) * (H_out * W_out);
         c_offsets[i] = i * M * (H_out * W_out);
     }
@@ -95,7 +100,7 @@ void OpenCLInterface::conv_forward_gemm_opencl(
         clblast::Transpose::kNo, 
         clblast::Transpose::kNo,
         M, 
-        (W-K+1)*(H-K+1), 
+        H_out*W_out, 
         C * K * K,
         alpha.data(),
         device_k,
