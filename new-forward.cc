@@ -55,11 +55,12 @@ void OpenCLInterface::conv_forward_gemm_opencl(
     const int W_out = W - K + 1;
 
     
-    size_t global_size_im2col[3] = {
+    /*size_t global_size_im2col[3] = {
         ((size_t)W_out + 15) / 16 * 16,  // Round up to multiple of 16
         ((size_t)H_out + 15) / 16 * 16,  // Round up to multiple of 16
         (size_t)(B*C)
-    };
+    };*/
+    size_t global_size_im2col[3] = {(size_t)W_out, (size_t)H_out, (size_t)(B * C)};
     size_t local_size_im2col[3] = {16, 16, 1}; 
  
     // Set Kernel Arguments for im2col
