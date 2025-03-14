@@ -41,8 +41,9 @@ unrolled[unroll_idx] = x[input_idx];
 }
 }
 }
-}
-
 #undef x4d
 #undef x_unroll_3d
 }
+
+
+
