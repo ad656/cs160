@@ -30,8 +30,8 @@ __kernel void im2col(__global float *unrolled, __global float *x, const int B,
         for (int mask_offset_row = 0; mask_offset_row < K; mask_offset_row++) {
             for (int mask_offset_col = 0; mask_offset_col < K; mask_offset_col++) {
                 // Calculate output position
-                int row_o = row_i - mask_offset_row;
-                int col_o = col_i - mask_offset_col;
+                int row_o = row_i - (K - 1) + mask_offset_row;
+                int col_o = col_i - (K - 1) + mask_offset_col;
 
                 // Check if the output indices are within bounds
                 bool row_o_in_bounds = (0 <= row_o && row_o < H_out);
