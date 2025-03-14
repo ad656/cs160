@@ -120,7 +120,7 @@ void OpenCLInterface::conv_forward_gemm_opencl_epilog(
     CHECK_ERR(err, "clEnqueueReadBuffer device_y");
 
     clReleaseMemObject(device_x);
-    clReleaseMemObject(device_k);.
+    clReleaseMemObject(device_k);
     clReleaseMemObject(device_y);
     clReleaseMemObject(device_x_unroll);
 }
